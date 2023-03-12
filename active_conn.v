@@ -7,7 +7,7 @@ mut:
 	pool &Pool
 }
 
-pub fn (mut c ActiveRedisConn) close()! {
+pub fn (mut c ActiveRedisConn) close() ! {
 	c.pool.active--
 	c.socket.close()!
 }

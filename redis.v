@@ -1,17 +1,24 @@
 module vredis
 
 import net
+import time
+import sync
 
 [params]
 pub struct ConnOpts {
-	port        int    = 6379
-	host        string = '127.0.0.1'
-	requirepass string
+	read_timeout  time.Duration
+	write_timeout time.Duration
+	port          int    = 6379
+	host          string = '127.0.0.1'
+	username      string
+	requirepass   string
+	db            int
 }
 
 const ok_flag = '+OK'
 
 pub struct Redis {
+	sync.Mutex
 mut:
 	socket &net.TcpConn = unsafe { nil }
 }
@@ -35,9 +42,20 @@ pub enum KeyType {
 	t_unknown
 }
 
+fn (mut r Redis) str() string {
+	return r'vredis.Redis{}'
+}
+
 fn (mut r Redis) send_cmd(cmd string) !string {
+	r.@lock()
+	defer {
+		r.unlock()
+	}
+	println('${cmd} line')
 	r.socket.write_string(cmd + '\r\n')!
 	mut line := r.socket.read_line()
+	println('-----> ' + line)
+	// println('${cmd} line: ${line}')
 	if line.starts_with('$') {
 		mut buf := []u8{len: line.trim_left('$').int() - line.len}
 		r.socket.read(mut buf)!
@@ -52,12 +70,24 @@ pub fn connect(opts ConnOpts) !Redis {
 	}
 
 	if opts.requirepass.len > 0 {
-		if !client.send_cmd('AUTH ' + opts.requirepass)!.starts_with(ok_flag) {
+		if !client.send_cmd('AUTH "${opts.requirepass}"')!.starts_with(ok_flag) {
 			panic(error('auth password failed'))
 		}
 	}
+
+	if opts.db > 0 && !client.send_cmd('SELECT ${opts.db}')!.starts_with(ok_flag){
+		panic(error('switch db failed'))
+	}
+	// spawn fn [mut client] ()! {
+	// 	for {
+	// 		println(client.send_cmd('PING')!)
+	// 		time.sleep(time.second * 1)
+	// 	}
+	// }()
+
 	return client
 }
+
 
 pub fn (mut r Redis) disconnect() {
 	r.socket.close() or {}
