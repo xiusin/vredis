@@ -3,6 +3,7 @@ module vredis
 import net
 import time
 import sync
+import strings
 
 [params]
 pub struct ConnOpts {
@@ -14,6 +15,8 @@ pub struct ConnOpts {
 	requirepass   string
 	db            int
 }
+
+const nil_flag = '(nil)'
 
 const ok_flag = '+OK'
 
@@ -46,22 +49,49 @@ fn (mut r Redis) str() string {
 	return r'vredis.Redis{}'
 }
 
+fn (mut r Redis) read_from_socket(len int) !string {
+	mut read_cnt := 0
+	mut s_buf := strings.new_builder(len)
+	for read_cnt != len {
+		// After multiple tests, it has been found that there may be a situation where the content is not fully read at once, so segmented reading is temporarily being used.取
+		chunk_len := if len - read_cnt >= 1024 { 1024 } else { len - read_cnt }
+		mut buf := []u8{len: chunk_len}
+		read_chunk_cnt := r.socket.read(mut buf)!
+		read_cnt += read_chunk_cnt
+		s_buf.write(buf[0..read_chunk_cnt])!
+		unsafe { buf.free() }
+	}
+	// println('read_cnt: ${read_cnt}')
+	str := s_buf.bytestr()
+	unsafe { s_buf.free() }
+	return str
+}
+
 fn (mut r Redis) send_cmd(cmd string) !string {
 	r.@lock()
 	defer {
 		r.unlock()
 	}
-	println('${cmd} line')
 	r.socket.write_string(cmd + '\r\n')!
 	mut line := r.socket.read_line()
-	println('-----> ' + line)
-	// println('${cmd} line: ${line}')
 	if line.starts_with('$') {
-		mut buf := []u8{len: line.trim_left('$').int() - line.len}
-		r.socket.read(mut buf)!
-		return buf.bytestr()
+		return if line.starts_with('$-1') {
+			'(nil)'
+		} else {
+			r.read_from_socket( line.trim_left('$').int() + 2)!
+		}
+	} else if line.starts_with('*') {
+		line_num := line.trim_left('*').int()
+		mut lines := []string{cap: line_num}
+		for i := 0; i < line_num; i++ {
+			line_cont := r.socket.read_line()
+			if line_cont.starts_with('$') {
+				lines << r.read_from_socket(line_cont.trim_left('$').int() + 2)!.trim_right('\r\n')
+			}
+		}
+		return lines.join('\r\n')
 	}
-	return line
+	return line.trim_right('\r\n')
 }
 
 pub fn connect(opts ConnOpts) !Redis {
@@ -75,22 +105,19 @@ pub fn connect(opts ConnOpts) !Redis {
 		}
 	}
 
-	if opts.db > 0 && !client.send_cmd('SELECT ${opts.db}')!.starts_with(ok_flag){
+	if opts.db > 0 && !client.send_cmd('SELECT ${opts.db}')!.starts_with(ok_flag) {
 		panic(error('switch db failed'))
 	}
-	// spawn fn [mut client] ()! {
-	// 	for {
-	// 		println(client.send_cmd('PING')!)
-	// 		time.sleep(time.second * 1)
-	// 	}
-	// }()
 
 	return client
 }
 
+pub fn (mut r Redis) ping() !bool {
+	return r.send_cmd('PING')! == '+PONG'
+}
 
-pub fn (mut r Redis) disconnect() {
-	r.socket.close() or {}
+pub fn (mut r Redis) close() ! {
+	r.socket.close()!
 }
 
 pub fn (mut r Redis) set(key string, value string) bool {
