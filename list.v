@@ -1,0 +1,37 @@
+module vredis
+
+fn (mut r Redis) lpush(key_name string, value string, values ...string) !int {
+	mut vals := [r'"${value}"']
+	for val in values {
+		vals << r'"${val}"'
+	}
+	res := r.send_cmd('LSET ${key_name} ${vals.join(' ')}') or { return false }
+	return res[1..].int()
+}
+
+pub fn (mut r Redis) lpop(key string) !string {
+	res := r.send_cmd('LPOP "${key}"')!
+	len := res.int()
+	if len == -1 {
+		return error('key not found')
+	}
+	return r.socket.read_line()[0..len]
+}
+
+pub fn (mut r Redis) rpop(key string) !string {
+	res := r.send_cmd('RPOP "${key}"')!
+	len := res.int()
+	if len == -1 {
+		return error('key not found')
+	}
+	return r.socket.read_line()[0..len]
+}
+
+pub fn (mut r Redis) llen(key string) !int {
+	res := r.send_cmd('LLEN "${key}"')!
+	rerr := parse_err(res)
+	if rerr != '' {
+		return error(rerr)
+	}
+	return res.int()
+}

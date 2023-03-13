@@ -16,8 +16,6 @@ pub struct ConnOpts {
 	db            int
 }
 
-const nil_flag = '(nil)'
-
 const ok_flag = '+OK'
 
 pub struct Redis {
@@ -61,7 +59,6 @@ fn (mut r Redis) read_from_socket(len int) !string {
 		s_buf.write(buf[0..read_chunk_cnt])!
 		unsafe { buf.free() }
 	}
-	// println('read_cnt: ${read_cnt}')
 	str := s_buf.bytestr()
 	unsafe { s_buf.free() }
 	return str
@@ -78,7 +75,7 @@ fn (mut r Redis) send_cmd(cmd string) !string {
 		return if line.starts_with('$-1') {
 			'(nil)'
 		} else {
-			r.read_from_socket( line.trim_left('$').int() + 2)!
+			r.read_from_socket(line.trim_left('$').int() + 2)!
 		}
 	} else if line.starts_with('*') {
 		line_num := line.trim_left('*').int()
@@ -100,12 +97,12 @@ pub fn connect(opts ConnOpts) !Redis {
 	}
 
 	if opts.requirepass.len > 0 {
-		if !client.send_cmd('AUTH "${opts.requirepass}"')!.starts_with(ok_flag) {
+		if !client.send_cmd('AUTH "${opts.requirepass}"')!.starts_with(vredis.ok_flag) {
 			panic(error('auth password failed'))
 		}
 	}
 
-	if opts.db > 0 && !client.send_cmd('SELECT ${opts.db}')!.starts_with(ok_flag) {
+	if opts.db > 0 && !client.send_cmd('SELECT ${opts.db}')!.starts_with(vredis.ok_flag) {
 		panic(error('switch db failed'))
 	}
 
@@ -118,11 +115,6 @@ pub fn (mut r Redis) ping() !bool {
 
 pub fn (mut r Redis) close() ! {
 	r.socket.close()!
-}
-
-pub fn (mut r Redis) set(key string, value string) bool {
-	res := r.send_cmd('SET "${key}" "${value}"') or { return false }
-	return res.starts_with(ok_flag)
 }
 
 pub fn (mut r Redis) set_opts(key string, value string, opts SetOpts) bool {
@@ -142,80 +134,13 @@ pub fn (mut r Redis) set_opts(key string, value string, opts SetOpts) bool {
 	}
 	keep_ttl := if opts.keep_ttl == false { '' } else { ' KEEPTTL' }
 	res := r.send_cmd('SET "${key}" "${value}"${ex}${nx}${keep_ttl}') or { return false }
-	return res.starts_with(ok_flag)
-}
-
-pub fn (mut r Redis) setex(key string, seconds int, value string) bool {
-	return r.set_opts(key, value, SetOpts{
-		ex: seconds
-	})
+	return res.starts_with(vredis.ok_flag)
 }
 
 pub fn (mut r Redis) psetex(key string, millis int, value string) bool {
 	return r.set_opts(key, value, SetOpts{
 		px: millis
 	})
-}
-
-pub fn (mut r Redis) setnx(key string, value string) int {
-	res := r.set_opts(key, value, SetOpts{
-		nx: true
-	})
-	return if res == true { 1 } else { 0 }
-}
-
-pub fn (mut r Redis) incrby(key string, increment int) !int {
-	res := r.send_cmd('INCRBY "${key}" ${increment}')!
-	rerr := parse_err(res)
-	if rerr != '' {
-		return error(rerr)
-	}
-	return res.int()
-}
-
-pub fn (mut r Redis) incr(key string) !int {
-	res := r.incrby(key, 1)!
-	return res
-}
-
-pub fn (mut r Redis) decr(key string) !int {
-	res := r.incrby(key, -1)!
-	return res
-}
-
-pub fn (mut r Redis) decrby(key string, decrement int) !int {
-	res := r.incrby(key, -decrement)!
-	return res
-}
-
-pub fn (mut r Redis) incrbyfloat(key string, increment f64) !f64 {
-	mut res := r.send_cmd('INCRBYFLOAT "${key}" ${increment}')!
-	rerr := parse_err(res)
-	if rerr != '' {
-		return error(rerr)
-	}
-	res = r.socket.read_line()
-	return res.f64()
-}
-
-pub fn (mut r Redis) append(key string, value string) !int {
-	res := r.send_cmd('APPEND "${key}" "${value}"')!
-	return res.int()
-}
-
-pub fn (mut r Redis) setrange(key string, offset int, value string) !int {
-	res := r.send_cmd('SETRANGE "${key}" ${offset} "${value}"')!
-	return res.int()
-}
-
-pub fn (mut r Redis) lpush(key string, element string) !int {
-	res := r.send_cmd('LPUSH "${key}" "${element}"')!
-	return res.int()
-}
-
-pub fn (mut r Redis) rpush(key string, element string) !int {
-	res := r.send_cmd('RPUSH "${key}" "${element}"')!
-	return res.int()
 }
 
 pub fn (mut r Redis) expire(key string, seconds int) !int {
@@ -243,34 +168,6 @@ pub fn (mut r Redis) persist(key string) !int {
 	return res.int()
 }
 
-pub fn (mut r Redis) get(key string) !string {
-	res := r.send_cmd('GET "${key}"')!
-	len := res.int()
-	if len == -1 {
-		return error('key not found')
-	}
-	return r.socket.read_line()[0..len]
-}
-
-pub fn (mut r Redis) getset(key string, value string) !string {
-	res := r.send_cmd('GETSET "${key}" ${value}')!
-	len := res.int()
-	if len == -1 {
-		return ''
-	}
-	return r.socket.read_line()[0..len]
-}
-
-pub fn (mut r Redis) getrange(key string, start int, end int) !string {
-	res := r.send_cmd('GETRANGE "${key}" ${start} ${end}')!
-	len := res.int()
-	if len == 0 {
-		r.socket.read_line()
-		return ''
-	}
-	return r.socket.read_line()[0..len]
-}
-
 pub fn (mut r Redis) randomkey() !string {
 	res := r.send_cmd('RANDOMKEY')!
 	len := res.int()
@@ -278,38 +175,6 @@ pub fn (mut r Redis) randomkey() !string {
 		return error('database is empty')
 	}
 	return r.socket.read_line()[0..len]
-}
-
-pub fn (mut r Redis) strlen(key string) !int {
-	res := r.send_cmd('STRLEN "${key}"')!
-	return res.int()
-}
-
-pub fn (mut r Redis) lpop(key string) !string {
-	res := r.send_cmd('LPOP "${key}"')!
-	len := res.int()
-	if len == -1 {
-		return error('key not found')
-	}
-	return r.socket.read_line()[0..len]
-}
-
-pub fn (mut r Redis) rpop(key string) !string {
-	res := r.send_cmd('RPOP "${key}"')!
-	len := res.int()
-	if len == -1 {
-		return error('key not found')
-	}
-	return r.socket.read_line()[0..len]
-}
-
-pub fn (mut r Redis) llen(key string) !int {
-	res := r.send_cmd('LLEN "${key}"')!
-	rerr := parse_err(res)
-	if rerr != '' {
-		return error(rerr)
-	}
-	return res.int()
 }
 
 pub fn (mut r Redis) ttl(key string) !int {
@@ -368,7 +233,7 @@ pub fn (mut r Redis) del(key string) !int {
 
 pub fn (mut r Redis) rename(key string, newkey string) bool {
 	res := r.send_cmd('RENAME "${key}" "${newkey}"') or { return false }
-	return res.starts_with(ok_flag)
+	return res.starts_with(vredis.ok_flag)
 }
 
 pub fn (mut r Redis) renamenx(key string, newkey string) !int {
@@ -382,7 +247,7 @@ pub fn (mut r Redis) renamenx(key string, newkey string) !int {
 
 pub fn (mut r Redis) flushall() bool {
 	res := r.send_cmd('FLUSHALL') or { return false }
-	return res.starts_with(ok_flag)
+	return res.starts_with(vredis.ok_flag)
 }
 
 fn parse_err(res string) string {
