@@ -1,20 +1,24 @@
 module vredis
 
-fn test_redis() {
+fn test_redis()! {
 	mut redis := connect(host: '124.222.103.232', port: 6379, requirepass: 'yuAU702G!!')!
 
 	defer {
 		redis.close() or {}
 	}
 
-	redis.hset('website', 'baidu1', 'www.baidu.com111')
-	redis.hset('website', 'baidu2', 'www.baidu.com111')
-	println('hlen = ${redis.hlen('website')}')
-	println( 'hkeys = ${redis.hkeys('website')}')
-	println( 'hexits = ${redis.hexists('website', 'baidu')}')
-	println( 'hexits = ${redis.hexists('website', 'baidu1')}')
-	println( 'hget = ${redis.hget('website', 'baidu1')!}')
+	// redis.hset('website', 'baidu1', 'www.baidu.com111')
+	// redis.hset('website', 'baidu2', 'www.baidu.com111')
+	// println('hlen = ${redis.hlen('website')}')
+	// println( 'hkeys = ${redis.hkeys('website')}')
+	// println( 'hexits = ${redis.hexists('website', 'baidu')}')
+	// println( 'hexits = ${redis.hexists('website', 'baidu1')}')
+	// println( 'hget = ${redis.hget('website', 'baidu1')!}')
+	// println('hgetall = ${!}')
+	// redis.hgetall('website')!
+	println(redis.hincrby('website', 'num', 1)!)
 
+	redis.hvals('website')
 	// println(redis)
 	// redis.send_cmd('GET name')!
 	// println(redis.ping()!)

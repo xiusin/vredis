@@ -1,11 +1,11 @@
 module vredis
 
 fn (mut r Redis) lpush(key_name string, value string, values ...string) !int {
-	mut vals := [r'"${value}"']
+	mut vals := ['"${value}"']
 	for val in values {
-		vals << r'"${val}"'
+		vals << '"${val}"'
 	}
-	res := r.send_cmd('LSET ${key_name} ${vals.join(' ')}') or { return false }
+	res := r.send_cmd('LSET ${key_name} ${vals.join(' ')}') or { return 0 }
 	return res[1..].int()
 }
 

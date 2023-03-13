@@ -71,6 +71,11 @@ fn (mut r Redis) send_cmd(cmd string) !string {
 	}
 	r.socket.write_string(cmd + '\r\n')!
 	mut line := r.socket.read_line()
+	// if cmd.contains('HGETALL') {
+	// 	println('HGETALL')
+	// 	println('HGETALL: ${line}')
+	// 	return line
+	// }
 	if line.starts_with('$') {
 		return if line.starts_with('$-1') {
 			'(nil)'
@@ -97,12 +102,12 @@ pub fn connect(opts ConnOpts) !Redis {
 	}
 
 	if opts.requirepass.len > 0 {
-		if !client.send_cmd('AUTH "${opts.requirepass}"')!.starts_with(vredis.ok_flag) {
+		if !client.send_cmd('AUTH "${opts.requirepass}"')!.starts_with(ok_flag) {
 			panic(error('auth password failed'))
 		}
 	}
 
-	if opts.db > 0 && !client.send_cmd('SELECT ${opts.db}')!.starts_with(vredis.ok_flag) {
+	if opts.db > 0 && !client.send_cmd('SELECT ${opts.db}')!.starts_with(ok_flag) {
 		panic(error('switch db failed'))
 	}
 
@@ -134,7 +139,7 @@ pub fn (mut r Redis) set_opts(key string, value string, opts SetOpts) bool {
 	}
 	keep_ttl := if opts.keep_ttl == false { '' } else { ' KEEPTTL' }
 	res := r.send_cmd('SET "${key}" "${value}"${ex}${nx}${keep_ttl}') or { return false }
-	return res.starts_with(vredis.ok_flag)
+	return res.starts_with(ok_flag)
 }
 
 pub fn (mut r Redis) psetex(key string, millis int, value string) bool {
@@ -233,7 +238,7 @@ pub fn (mut r Redis) del(key string) !int {
 
 pub fn (mut r Redis) rename(key string, newkey string) bool {
 	res := r.send_cmd('RENAME "${key}" "${newkey}"') or { return false }
-	return res.starts_with(vredis.ok_flag)
+	return res.starts_with(ok_flag)
 }
 
 pub fn (mut r Redis) renamenx(key string, newkey string) !int {
@@ -247,7 +252,7 @@ pub fn (mut r Redis) renamenx(key string, newkey string) !int {
 
 pub fn (mut r Redis) flushall() bool {
 	res := r.send_cmd('FLUSHALL') or { return false }
-	return res.starts_with(vredis.ok_flag)
+	return res.starts_with(ok_flag)
 }
 
 fn parse_err(res string) string {
