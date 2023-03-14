@@ -64,18 +64,17 @@ fn (mut r Redis) read_from_socket(len int) !string {
 	return str
 }
 
-fn (mut r Redis) send_cmd(cmd string) !string {
+pub fn (mut r Redis) send(cmd string) !string {
 	r.@lock()
 	defer {
 		r.unlock()
 	}
 	r.socket.write_string(cmd + '\r\n')!
+	return r.read_reply()!
+}
+
+fn (mut r Redis) read_reply() !string {
 	mut line := r.socket.read_line()
-	// if cmd.contains('HGETALL') {
-	// 	println('HGETALL')
-	// 	println('HGETALL: ${line}')
-	// 	return line
-	// }
 	if line.starts_with('$') {
 		return if line.starts_with('$-1') {
 			'(nil)'
@@ -87,7 +86,9 @@ fn (mut r Redis) send_cmd(cmd string) !string {
 		mut lines := []string{cap: line_num}
 		for i := 0; i < line_num; i++ {
 			line_cont := r.socket.read_line()
-			if line_cont.starts_with('$') {
+			if line_cont.contains('$-1') {
+				lines << '(nil)' // mget
+			} else if line_cont.starts_with('$') {
 				lines << r.read_from_socket(line_cont.trim_left('$').int() + 2)!.trim_right('\r\n')
 			}
 		}
@@ -102,12 +103,12 @@ pub fn connect(opts ConnOpts) !Redis {
 	}
 
 	if opts.requirepass.len > 0 {
-		if !client.send_cmd('AUTH "${opts.requirepass}"')!.starts_with(ok_flag) {
+		if !client.send('AUTH "${opts.requirepass}"')!.starts_with(ok_flag) {
 			panic(error('auth password failed'))
 		}
 	}
 
-	if opts.db > 0 && !client.send_cmd('SELECT ${opts.db}')!.starts_with(ok_flag) {
+	if opts.db > 0 && !client.send('SELECT ${opts.db}')!.starts_with(ok_flag) {
 		panic(error('switch db failed'))
 	}
 
@@ -115,7 +116,7 @@ pub fn connect(opts ConnOpts) !Redis {
 }
 
 pub fn (mut r Redis) ping() !bool {
-	return r.send_cmd('PING')! == '+PONG'
+	return r.send('PING')! == '+PONG'
 }
 
 pub fn (mut r Redis) close() ! {
@@ -138,7 +139,7 @@ pub fn (mut r Redis) set_opts(key string, value string, opts SetOpts) bool {
 		' XX'
 	}
 	keep_ttl := if opts.keep_ttl == false { '' } else { ' KEEPTTL' }
-	res := r.send_cmd('SET "${key}" "${value}"${ex}${nx}${keep_ttl}') or { return false }
+	res := r.send('SET "${key}" "${value}"${ex}${nx}${keep_ttl}') or { return false }
 	return res.starts_with(ok_flag)
 }
 
@@ -149,32 +150,32 @@ pub fn (mut r Redis) psetex(key string, millis int, value string) bool {
 }
 
 pub fn (mut r Redis) expire(key string, seconds int) !int {
-	res := r.send_cmd('EXPIRE "${key}" ${seconds}')!
+	res := r.send('EXPIRE "${key}" ${seconds}')!
 	return res.int()
 }
 
 pub fn (mut r Redis) pexpire(key string, millis int) !int {
-	res := r.send_cmd('PEXPIRE "${key}" ${millis}')!
+	res := r.send('PEXPIRE "${key}" ${millis}')!
 	return res.int()
 }
 
 pub fn (mut r Redis) expireat(key string, timestamp int) !int {
-	res := r.send_cmd('EXPIREAT "${key}" ${timestamp}')!
+	res := r.send('EXPIREAT "${key}" ${timestamp}')!
 	return res.int()
 }
 
 pub fn (mut r Redis) pexpireat(key string, millistimestamp i64) !int {
-	res := r.send_cmd('PEXPIREAT "${key}" ${millistimestamp}')!
+	res := r.send('PEXPIREAT "${key}" ${millistimestamp}')!
 	return res.int()
 }
 
 pub fn (mut r Redis) persist(key string) !int {
-	res := r.send_cmd('PERSIST "${key}"')!
+	res := r.send('PERSIST "${key}"')!
 	return res.int()
 }
 
 pub fn (mut r Redis) randomkey() !string {
-	res := r.send_cmd('RANDOMKEY')!
+	res := r.send('RANDOMKEY')!
 	len := res.int()
 	if len == -1 {
 		return error('database is empty')
@@ -183,22 +184,22 @@ pub fn (mut r Redis) randomkey() !string {
 }
 
 pub fn (mut r Redis) ttl(key string) !int {
-	res := r.send_cmd('TTL "${key}"')!
+	res := r.send('TTL "${key}"')!
 	return res.int()
 }
 
 pub fn (mut r Redis) pttl(key string) !int {
-	res := r.send_cmd('PTTL "${key}"')!
+	res := r.send('PTTL "${key}"')!
 	return res.int()
 }
 
 pub fn (mut r Redis) exists(key string) !int {
-	res := r.send_cmd('EXISTS "${key}"')!
+	res := r.send('EXISTS "${key}"')!
 	return res.int()
 }
 
 pub fn (mut r Redis) type_of(key string) !KeyType {
-	res := r.send_cmd('TYPE "${key}"')!
+	res := r.send('TYPE "${key}"')!
 	if res.len > 6 {
 		return match res#[1..res.len - 2] {
 			'none' {
@@ -232,17 +233,17 @@ pub fn (mut r Redis) type_of(key string) !KeyType {
 }
 
 pub fn (mut r Redis) del(key string) !int {
-	res := r.send_cmd('DEL "${key}"')!
+	res := r.send('DEL "${key}"')!
 	return res.int()
 }
 
 pub fn (mut r Redis) rename(key string, newkey string) bool {
-	res := r.send_cmd('RENAME "${key}" "${newkey}"') or { return false }
+	res := r.send('RENAME "${key}" "${newkey}"') or { return false }
 	return res.starts_with(ok_flag)
 }
 
 pub fn (mut r Redis) renamenx(key string, newkey string) !int {
-	res := r.send_cmd('RENAMENX "${key}" "${newkey}"')!
+	res := r.send('RENAMENX "${key}" "${newkey}"')!
 	rerr := parse_err(res)
 	if rerr != '' {
 		return error(rerr)
@@ -251,7 +252,7 @@ pub fn (mut r Redis) renamenx(key string, newkey string) !int {
 }
 
 pub fn (mut r Redis) flushall() bool {
-	res := r.send_cmd('FLUSHALL') or { return false }
+	res := r.send('FLUSHALL') or { return false }
 	return res.starts_with(ok_flag)
 }
 

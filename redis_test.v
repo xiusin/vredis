@@ -1,29 +1,41 @@
 module vredis
 
 fn test_redis()! {
-	mut redis := connect(host: '124.222.103.232', port: 6379, requirepass: 'yuAU702G!!')!
+	mut redis := connect()!
 
 	defer {
 		redis.close() or {}
 	}
 
+	redis.set('name', 'xiusin')
+	redis.set('age', '18')
 	// redis.hset('website', 'baidu1', 'www.baidu.com111')
-	// redis.hset('website', 'baidu2', 'www.baidu.com111')
+	redis.hset('website', 'baidu4', 'www.baidu.com444')
 	// println('hlen = ${redis.hlen('website')}')
 	// println( 'hkeys = ${redis.hkeys('website')}')
 	// println( 'hexits = ${redis.hexists('website', 'baidu')}')
 	// println( 'hexits = ${redis.hexists('website', 'baidu1')}')
 	// println( 'hget = ${redis.hget('website', 'baidu1')!}')
-	// println('hgetall = ${!}')
-	// redis.hgetall('website')!
-	println(redis.hincrby('website', 'num', 1)!)
+	// println('hgetall = ${redis.hgetall('website')!}')
+	// println('sadd = ${redis.sadd('names', 'zhangsan', 'li si', 'wang W')}')
+	// println('SCARD = ${redis.scard('names')}')
+	// println('sismember = ${redis.sismember('names', 'zhangsan')}')
+	// println('srandmember = ${redis.srandmember('names', 2)}')
 
-	redis.hvals('website')
+	println(redis.mget('name', 'age', 'address'))
+
+
+	// println(redis.hincrby('website', 'num', 1)!)
+
+	// println('hvals = ${redis.hvals('website')}')
+	// redis.hdel('website', 'num')
+	// println('hvals = ${redis.hvals('website')}')
+
 	// println(redis)
-	// redis.send_cmd('GET name')!
+	// redis.send('GET name')!
 	// println(redis.ping()!)
 	// redis.set("name", "xiusin")
-	// println(redis.send_cmd('GET name')!)
-	// os.write_file("info.log", redis.send_cmd("INFO")!)!
+	// println(redis.send('GET name')!)
+	// os.write_file("info.log", redis.send("INFO")!)!
 
 }
