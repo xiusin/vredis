@@ -115,3 +115,29 @@ pub fn (mut r Redis) mget(key string, keys ... string) map[string]string {
 	}
 	return data
 }
+
+pub fn (mut r Redis) set_opts(key string, value string, opts SetOpts) bool {
+	ex := if opts.ex == -4 && opts.px == -4 {
+		''
+	} else if opts.ex != -4 {
+		' EX ${opts.ex}'
+	} else {
+		' PX ${opts.px}'
+	}
+	nx := if opts.nx == false && opts.xx == false {
+		''
+	} else if opts.nx == true {
+		' NX'
+	} else {
+		' XX'
+	}
+	keep_ttl := if opts.keep_ttl == false { '' } else { ' KEEPTTL' }
+	res := r.send('SET "${key}" "${value}"${ex}${nx}${keep_ttl}') or { return false }
+	return res.starts_with(ok_flag)
+}
+
+pub fn (mut r Redis) psetex(key string, millis int, value string) bool {
+	return r.set_opts(key, value, SetOpts{
+		px: millis
+	})
+}

@@ -70,10 +70,10 @@ pub fn (mut r Redis) send(cmd string) !string {
 		r.unlock()
 	}
 	r.socket.write_string(cmd + '\r\n')!
-	return r.read_reply()!
+	return r.read_reply(cmd)!
 }
 
-fn (mut r Redis) read_reply() !string {
+fn (mut r Redis) read_reply(cmd string) !string {
 	mut line := r.socket.read_line()
 	if line.starts_with('$') {
 		return if line.starts_with('$-1') {
@@ -97,7 +97,7 @@ fn (mut r Redis) read_reply() !string {
 	return line.trim_right('\r\n')
 }
 
-pub fn connect(opts ConnOpts) !Redis {
+pub fn new_client(opts ConnOpts) !Redis {
 	mut client := Redis{
 		socket: net.dial_tcp('${opts.host}:${opts.port}')!
 	}
@@ -111,7 +111,6 @@ pub fn connect(opts ConnOpts) !Redis {
 	if opts.db > 0 && !client.send('SELECT ${opts.db}')!.starts_with(ok_flag) {
 		panic(error('switch db failed'))
 	}
-
 	return client
 }
 
@@ -121,32 +120,6 @@ pub fn (mut r Redis) ping() !bool {
 
 pub fn (mut r Redis) close() ! {
 	r.socket.close()!
-}
-
-pub fn (mut r Redis) set_opts(key string, value string, opts SetOpts) bool {
-	ex := if opts.ex == -4 && opts.px == -4 {
-		''
-	} else if opts.ex != -4 {
-		' EX ${opts.ex}'
-	} else {
-		' PX ${opts.px}'
-	}
-	nx := if opts.nx == false && opts.xx == false {
-		''
-	} else if opts.nx == true {
-		' NX'
-	} else {
-		' XX'
-	}
-	keep_ttl := if opts.keep_ttl == false { '' } else { ' KEEPTTL' }
-	res := r.send('SET "${key}" "${value}"${ex}${nx}${keep_ttl}') or { return false }
-	return res.starts_with(ok_flag)
-}
-
-pub fn (mut r Redis) psetex(key string, millis int, value string) bool {
-	return r.set_opts(key, value, SetOpts{
-		px: millis
-	})
 }
 
 pub fn (mut r Redis) expire(key string, seconds int) !int {
@@ -175,12 +148,7 @@ pub fn (mut r Redis) persist(key string) !int {
 }
 
 pub fn (mut r Redis) randomkey() !string {
-	res := r.send('RANDOMKEY')!
-	len := res.int()
-	if len == -1 {
-		return error('database is empty')
-	}
-	return r.socket.read_line()[0..len]
+	return r.send('RANDOMKEY')!
 }
 
 pub fn (mut r Redis) ttl(key string) !int {
