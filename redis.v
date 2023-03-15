@@ -70,10 +70,10 @@ pub fn (mut r Redis) send(cmd string) !string {
 		r.unlock()
 	}
 	r.socket.write_string(cmd + '\r\n')!
-	return r.read_reply(cmd)!
+	return r.read_reply()!
 }
 
-fn (mut r Redis) read_reply(cmd string) !string {
+fn (mut r Redis) read_reply() !string {
 	mut line := r.socket.read_line()
 	if line.starts_with('$') {
 		return if line.starts_with('$-1') {

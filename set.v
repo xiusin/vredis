@@ -45,17 +45,19 @@ pub fn (mut r Redis) srem(key string, member1 string, member2 ...string) int {
 	return res.trim_left(':').int()
 }
 
-fn (mut r Redis) multi_keys_handle(cmd string, key1 string, key2 []string) []string {
-	mut keys := [key1]
-	keys << key2
-	keys = keys.map('"${it}"')
-	res := r.send("${cmd} ${keys.join(' ')}") or  { return [] }
+fn (mut r Redis) multi_keys_handle(cmd string, key string, keys []string) []string {
+	mut all_keys := [key]
+	all_keys << keys
+	all_keys = all_keys.map('"${it}"')
+	res := r.send("${cmd} ${all_keys.join(' ')}") or  { return [] }
 	return res.split('\r\n')
 }
 
 fn (mut r Redis) multi_keys_store_handle(cmd string, key string, keys []string) int {
-	mut key_arr := keys.map('"${it}"')
-	res := r.send('${cmd} "${key}" ${key_arr.join(' ')}') or  { ':0' }
+	mut all_keys := [key]
+	all_keys << keys
+	all_keys = all_keys.map('"${it}"')
+	res := r.send('${cmd} ${all_keys.join(' ')}') or  { ':0' }
 	return res.trim_left(':').int()
 }
 
@@ -83,8 +85,13 @@ pub fn (mut r Redis) sinterstore(key string, keys ...string) int {
 	return r.multi_keys_store_handle("SINTERSTORE", key, keys)
 }
 
-// TODO
-pub fn (mut r Redis) sscan(key string, cursor i64, opts SScanOpts) []string {
+pub struct ScanResult {
+	cursor u64
+	result []string
+}
+
+pub fn (mut r Redis) sscan(key string, cursor i64, opts SScanOpts) !ScanResult {
+	panic(error('redis.sscan not implement'))
 	mut cmd := 'SSCAN "${key}" ${cursor} '
 	if opts.pattern.len > 0 {
 		cmd += 'MATCH "${opts.pattern}" '
@@ -92,7 +99,27 @@ pub fn (mut r Redis) sscan(key string, cursor i64, opts SScanOpts) []string {
 	if opts.count > 0 {
 		cmd += 'COUNT ${opts.count}'
 	}
+	r.@lock()
+	defer {
+		r.unlock()
+	}
+	next_cursor := r.send(cmd, true)!
 
-	res := r.send(cmd) or { return [] }
-	return res.split('\r\n')
+	// r.socket.set_blocking(false)!
+	// defer {
+	// 	r.socket.set_blocking(false) or { panic(err) }
+	// }
+	println(r.read_reply('SSCAN')!)
+	println(r.read_reply('SSCAN')!)
+	println(r.read_reply('SSCAN')!)
+	println(r.read_reply('SSCAN')!)
+	println(r.read_reply('SSCAN')!)
+	println(r.read_reply('SSCAN')!)
+	println(r.read_reply('SSCAN')!)
+	println(r.read_reply('SSCAN')!)
+	println(r.read_reply('SSCAN')!)
+	println(r.read_reply('SSCAN')!)
+
+	// res.split('\r\n')
+	return ScanResult{cursor: next_cursor.u64(), result: []}
 }
