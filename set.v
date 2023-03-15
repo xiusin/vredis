@@ -103,22 +103,13 @@ pub fn (mut r Redis) sscan(key string, cursor i64, opts SScanOpts) !ScanResult {
 	defer {
 		r.unlock()
 	}
-	next_cursor := r.send(cmd, true)!
+	next_cursor := r.send(cmd)!
 
 	// r.socket.set_blocking(false)!
 	// defer {
 	// 	r.socket.set_blocking(false) or { panic(err) }
 	// }
-	println(r.read_reply('SSCAN')!)
-	println(r.read_reply('SSCAN')!)
-	println(r.read_reply('SSCAN')!)
-	println(r.read_reply('SSCAN')!)
-	println(r.read_reply('SSCAN')!)
-	println(r.read_reply('SSCAN')!)
-	println(r.read_reply('SSCAN')!)
-	println(r.read_reply('SSCAN')!)
-	println(r.read_reply('SSCAN')!)
-	println(r.read_reply('SSCAN')!)
+	println(r.read_reply()!)
 
 	// res.split('\r\n')
 	return ScanResult{cursor: next_cursor.u64(), result: []}
