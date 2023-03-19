@@ -3,7 +3,7 @@ module vredis
 [params]
 pub struct SScanOpts {
 	pattern string
-	count i64
+	count   i64
 }
 
 pub fn (mut r Redis) sadd(key string, member1 string, member2 ...string) int {
@@ -49,7 +49,7 @@ fn (mut r Redis) multi_keys_handle(cmd string, key string, keys []string) []stri
 	mut all_keys := [key]
 	all_keys << keys
 	all_keys = all_keys.map('"${it}"')
-	res := r.send("${cmd} ${all_keys.join(' ')}") or  { return [] }
+	res := r.send('${cmd} ${all_keys.join(' ')}') or { return [] }
 	return res.split('\r\n')
 }
 
@@ -57,24 +57,24 @@ fn (mut r Redis) multi_keys_store_handle(cmd string, key string, keys []string) 
 	mut all_keys := [key]
 	all_keys << keys
 	all_keys = all_keys.map('"${it}"')
-	res := r.send('${cmd} ${all_keys.join(' ')}') or  { ':0' }
+	res := r.send('${cmd} ${all_keys.join(' ')}') or { ':0' }
 	return res.trim_left(':').int()
 }
 
 pub fn (mut r Redis) sunion(key string, keys ...string) []string {
-	return r.multi_keys_handle("SUNION", key, keys)
+	return r.multi_keys_handle('SUNION', key, keys)
 }
 
 pub fn (mut r Redis) sunionstore(key string, keys ...string) int {
-	return r.multi_keys_store_handle("SUNIONSTORE", key, keys)
+	return r.multi_keys_store_handle('SUNIONSTORE', key, keys)
 }
 
 pub fn (mut r Redis) sdiff(key string, keys ...string) []string {
-	return r.multi_keys_handle("SDIFF", key, keys)
+	return r.multi_keys_handle('SDIFF', key, keys)
 }
 
 pub fn (mut r Redis) sdiffstore(key string, keys ...string) int {
-	return r.multi_keys_store_handle("SDIFFSTORE", key, keys)
+	return r.multi_keys_store_handle('SDIFFSTORE', key, keys)
 }
 
 pub fn (mut r Redis) sinter(key string, keys ...string) []string {
@@ -82,7 +82,7 @@ pub fn (mut r Redis) sinter(key string, keys ...string) []string {
 }
 
 pub fn (mut r Redis) sinterstore(key string, keys ...string) int {
-	return r.multi_keys_store_handle("SINTERSTORE", key, keys)
+	return r.multi_keys_store_handle('SINTERSTORE', key, keys)
 }
 
 pub struct ScanResult {
@@ -91,7 +91,6 @@ pub struct ScanResult {
 }
 
 pub fn (mut r Redis) sscan(key string, cursor i64, opts SScanOpts) !ScanResult {
-	panic(error('redis.sscan not implement'))
 	mut cmd := 'SSCAN "${key}" ${cursor} '
 	if opts.pattern.len > 0 {
 		cmd += 'MATCH "${opts.pattern}" '
@@ -104,13 +103,16 @@ pub fn (mut r Redis) sscan(key string, cursor i64, opts SScanOpts) !ScanResult {
 		r.unlock()
 	}
 	next_cursor := r.send(cmd)!
-
-	// r.socket.set_blocking(false)!
-	// defer {
-	// 	r.socket.set_blocking(false) or { panic(err) }
-	// }
-	println(r.read_reply()!)
-
-	// res.split('\r\n')
-	return ScanResult{cursor: next_cursor.u64(), result: []}
+	mut res := []string{cap: if opts.count > 0 { int(opts.count) } else { 10 }}
+	for {
+		line := r.read_reply(true)!
+		if line.len == 0 {
+			break
+		}
+		res << line[0..line.len - 2]
+	}
+	return ScanResult{
+		cursor: next_cursor.u64()
+		result: res
+	}
 }

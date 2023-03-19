@@ -22,6 +22,7 @@ pub struct Redis {
 	sync.Mutex
 mut:
 	socket &net.TcpConn = unsafe { nil }
+	prev_cmd string
 }
 
 pub struct SetOpts {
@@ -69,12 +70,71 @@ pub fn (mut r Redis) send(cmd string) !string {
 	defer {
 		r.unlock()
 	}
-	r.socket.write_string(cmd + '\r\n')!
+	r.write_string_to_socket(cmd)!
 	return r.read_reply()!
 }
 
-fn (mut r Redis) read_reply() !string {
-	mut line := r.socket.read_line()
+pub fn(mut r Redis) write_string_to_socket(cmd string)! {
+	r.prev_cmd = cmd
+	r.socket.write_string(cmd + '\r\n')!
+}
+
+// read_no_block
+// @form net
+fn (mut r Redis) read_no_block(max_line_len int) string {
+	r.socket.set_blocking(false) or {}
+
+	mut buf := [net.max_read]u8{} // where C.recv will store the network data
+	mut res := strings.new_builder(net.max_read) // The final result, including the ending \n.
+	defer {
+		unsafe { res.free() }
+	}
+	bstart := unsafe { &buf[0] }
+	for {
+		n := C.recv(r.socket.sock.handle, bstart, net.max_read - 1, net.msg_peek | net.msg_nosignal)
+		if n <= 0 {
+			return res.str()
+		}
+		buf[n] = `\0`
+		mut eol_idx := -1
+		mut lend := n
+		for i in 0 .. n {
+			if buf[i] == `\n` {
+				eol_idx = i
+				lend = i + 1
+				buf[lend] = `\0`
+				break
+			}
+		}
+		if eol_idx > 0 {
+			// At this point, we are sure that recv returned valid data,
+			// that contains *at least* one line.
+			// Ensure that the block till the first \n (including it)
+			// is removed from the socket's receive queue, so that it does
+			// not get read again.
+			C.recv(r.socket.sock.handle, bstart, lend, net.msg_nosignal)
+			unsafe { res.write_ptr(bstart, lend) }
+			break
+		}
+		// recv returned a buffer without \n in it, just store it for now:
+		C.recv(r.socket.sock.handle, bstart, n, net.msg_nosignal)
+		unsafe { res.write_ptr(bstart, lend) }
+		if res.len > max_line_len {
+			break
+		}
+	}
+	return res.str()
+}
+
+
+fn (mut r Redis) read_reply(no_blocking... bool) !string {
+	mut line := ""
+	if no_blocking.len  == 0 || no_blocking[0] == false {
+		line = r.socket.read_line()
+	} else {
+		line = r.read_no_block(net.max_read_line_len)
+	}
+	println('${r.prev_cmd} => ${line}')
 	if line.starts_with('$') {
 		return if line.starts_with('$-1') {
 			'(nil)'
@@ -90,6 +150,10 @@ fn (mut r Redis) read_reply() !string {
 				lines << '(nil)' // mget
 			} else if line_cont.starts_with('$') {
 				lines << r.read_from_socket(line_cont.trim_left('$').int() + 2)!.trim_right('\r\n')
+			} else if line_cont.starts_with(':') {
+				lines << line_cont[1..].trim_right('\r\n')
+			} else if line_cont.starts_with('*') {
+				lines << line_cont.trim_right('\r\n')
 			}
 		}
 		return lines.join('\r\n')
@@ -212,10 +276,7 @@ pub fn (mut r Redis) rename(key string, newkey string) bool {
 
 pub fn (mut r Redis) renamenx(key string, newkey string) !int {
 	res := r.send('RENAMENX "${key}" "${newkey}"')!
-	rerr := parse_err(res)
-	if rerr != '' {
-		return error(rerr)
-	}
+	r.check_err(res)!
 	return res.int()
 }
 
@@ -224,11 +285,11 @@ pub fn (mut r Redis) flushall() bool {
 	return res.starts_with(ok_flag)
 }
 
-fn parse_err(res string) string {
-	if res.len >= 5 && res.starts_with('-ERR') {
-		return res[5..res.len - 2]
+fn (mut r Redis) check_err(res string) ! {
+	if res.len >= 5 && res.starts_with('-') {
+		return error(res[1..].trim_right('\r\n'))
 	} else if res.len >= 11 && res[0..10] == '-WRONGTYPE' {
-		return res[11..res.len - 2]
+		return error(res[11..res.len - 2])
 	}
-	return ''
+	return
 }

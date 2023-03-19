@@ -2,10 +2,7 @@ module vredis
 
 pub fn (mut r Redis) incrby(key string, increment int) !int {
 	res := r.send('INCRBY "${key}" ${increment}')!
-	rerr := parse_err(res)
-	if rerr != '' {
-		return error(rerr)
-	}
+	r.check_err(res)!
 	return res.int()
 }
 
@@ -14,7 +11,7 @@ pub fn (mut r Redis) incr(key string) !int {
 }
 
 pub fn (mut r Redis) decr(key string) !int {
-	return  r.incrby(key, -1)!
+	return r.incrby(key, -1)!
 }
 
 pub fn (mut r Redis) decrby(key string, decrement int) !int {
@@ -23,10 +20,7 @@ pub fn (mut r Redis) decrby(key string, decrement int) !int {
 
 pub fn (mut r Redis) incrbyfloat(key string, increment f64) !f64 {
 	mut res := r.send('INCRBYFLOAT "${key}" ${increment}')!
-	rerr := parse_err(res)
-	if rerr != '' {
-		return error(rerr)
-	}
+	r.check_err(res)!
 	res = r.socket.read_line()
 	return res.f64()
 }
@@ -102,7 +96,7 @@ pub fn (mut r Redis) getbit(key string, offset int) u8 {
 	return res.trim_left(':').u8()
 }
 
-pub fn (mut r Redis) mget(key string, keys ... string) map[string]string {
+pub fn (mut r Redis) mget(key string, keys ...string) map[string]string {
 	mut keyarr := [key]
 	keyarr << keys
 
