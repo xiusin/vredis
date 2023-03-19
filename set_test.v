@@ -1,11 +1,10 @@
 module vredis
 
 fn test_set()! {
-	mut redis := new_client()!
-	defer {
-		redis.close() or {}
-	}
+	mut redis_scribe := new_client(host: '124.222.103.232', port: 6379, requirepass: 'yuAU702G!!')!
+	redis_scribe.subscribe('messages')!
 
+	println('end')
 	// for i in 0 .. 1000 {
 	// 	redis.sadd('sets', 'v${i + 30}')
 	// }
@@ -19,6 +18,10 @@ fn test_set()! {
 	// println('sinterstore = ${redis.sinterstore('sinterstore', 'sets', 'sets2')}')
 	// println('sismember = ${redis.sismember('sets', 'v2')}')
 	// println('sismember = ${redis.sismember('sets', 'v5')}')
-	println(redis.sscan('sets', 0)!)
+	// println(redis.sscan('sets', 0)!)
+
+
+
+
 
 }
