@@ -4,7 +4,6 @@ import sync
 import time
 import context
 import datatypes
-import strconv
 
 type DialFn = fn () !Redis
 
@@ -34,9 +33,7 @@ fn (mut p Pool) str() string {
 	defer {
 		p.mu.unlock()
 	}
-	return strconv.v_sprintf(r'vredis.Pool{
-	active: %d
-}', p.active)
+	return 'vredis.Pool{active: ${p.active}}'
 }
 
 fn (mut p Pool) get() !ActiveRedisConn {

@@ -18,11 +18,14 @@ pub struct ConnOpts {
 
 const ok_flag = '+OK'
 
+const nil_err = error('(nil)')
+
 pub struct Redis {
 	sync.Mutex
 mut:
 	socket &net.TcpConn = unsafe { nil }
 	prev_cmd string
+	debug bool
 }
 
 pub struct SetOpts {
@@ -33,19 +36,13 @@ pub struct SetOpts {
 	keep_ttl bool
 }
 
-pub enum KeyType {
-	t_none
-	t_string
-	t_list
-	t_set
-	t_zset
-	t_hash
-	t_stream
-	t_unknown
-}
-
 fn (mut r Redis) str() string {
 	return r'vredis.Redis{}'
+}
+
+[inline]
+fn (mut r Redis) is_nil(resp string) bool {
+	return resp == '(nil)'
 }
 
 fn (mut r Redis) read_from_socket(len int) !string {
@@ -134,12 +131,16 @@ fn (mut r Redis) read_reply(no_blocking... bool) !string {
 	} else {
 		line = r.read_no_block(net.max_read_line_len)
 	}
-	println('${r.prev_cmd} => ${line}')
-	if line.starts_with('$') {
-		return if line.starts_with('$-1') {
-			'(nil)'
-		} else {
+	if r.debug {
+		println('${r.prev_cmd} => ${line}')
+	}
+	if line.starts_with('-') {
+		r.check_err(line)!
+	} else if line.starts_with('$') {
+		return if !line.starts_with('$-1') {
 			r.read_from_socket(line.trim_left('$').int() + 2)!
+		} else {
+			'(nil)'
 		}
 	} else if line.starts_with('*') {
 		line_num := line.trim_left('*').int()
@@ -165,50 +166,55 @@ pub fn new_client(opts ConnOpts) !Redis {
 	mut client := Redis{
 		socket: net.dial_tcp('${opts.host}:${opts.port}')!
 	}
-
 	if opts.requirepass.len > 0 {
 		if !client.send('AUTH "${opts.requirepass}"')!.starts_with(ok_flag) {
-			panic(error('auth password failed'))
+			return error('auth password failed')
 		}
 	}
-
 	if opts.db > 0 && !client.send('SELECT ${opts.db}')!.starts_with(ok_flag) {
-		panic(error('switch db failed'))
+		return error('switch db failed')
 	}
 	return client
+}
+
+pub fn (mut r Redis) close() ! {
+	r.@lock()
+	defer {
+		r.unlock()
+	}
+	r.socket.close()!
 }
 
 pub fn (mut r Redis) ping() !bool {
 	return r.send('PING')! == '+PONG'
 }
 
-pub fn (mut r Redis) close() ! {
-	r.socket.close()!
+pub fn (mut r Redis) @type(key string) !string {
+	return r.send('TYPE ${key}')!.trim_left('+')
 }
 
-pub fn (mut r Redis) expire(key string, seconds int) !int {
-	res := r.send('EXPIRE "${key}" ${seconds}')!
-	return res.int()
+fn (mut r Redis) to_int(response string) int {
+	return response[1..].int()
 }
 
-pub fn (mut r Redis) pexpire(key string, millis int) !int {
-	res := r.send('PEXPIRE "${key}" ${millis}')!
-	return res.int()
+pub fn (mut r Redis) expire(key string, seconds int) !bool {
+	return r.to_int( r.send('EXPIRE "${key}" ${seconds}')!) == 1
 }
 
-pub fn (mut r Redis) expireat(key string, timestamp int) !int {
-	res := r.send('EXPIREAT "${key}" ${timestamp}')!
-	return res.int()
+pub fn (mut r Redis) pexpire(key string, millis int) !bool {
+	return r.to_int( r.send('PEXPIRE "${key}" ${millis}')!) == 1
 }
 
-pub fn (mut r Redis) pexpireat(key string, millistimestamp i64) !int {
-	res := r.send('PEXPIREAT "${key}" ${millistimestamp}')!
-	return res.int()
+pub fn (mut r Redis) expireat(key string, timestamp int) !bool {
+	return r.to_int( r.send('EXPIREAT "${key}" ${timestamp}')!) == 1
+}
+
+pub fn (mut r Redis) pexpireat(key string, millistimestamp i64) !bool {
+	return r.to_int(r.send('PEXPIREAT "${key}" ${millistimestamp}')!) == 1
 }
 
 pub fn (mut r Redis) persist(key string) !int {
-	res := r.send('PERSIST "${key}"')!
-	return res.int()
+	return r.to_int(r.send('PERSIST "${key}"')!)
 }
 
 pub fn (mut r Redis) randomkey() !string {
@@ -216,80 +222,44 @@ pub fn (mut r Redis) randomkey() !string {
 }
 
 pub fn (mut r Redis) ttl(key string) !int {
-	res := r.send('TTL "${key}"')!
-	return res.int()
+	return r.to_int(r.send('TTL "${key}"')!)
 }
 
 pub fn (mut r Redis) pttl(key string) !int {
-	res := r.send('PTTL "${key}"')!
-	return res.int()
+	return  r.to_int( r.send('PTTL "${key}"')!)
 }
 
-pub fn (mut r Redis) exists(key string) !int {
-	res := r.send('EXISTS "${key}"')!
-	return res.int()
+pub fn (mut r Redis) exists(key string) !bool {
+	return r.to_int(r.send('EXISTS "${key}"')!) == 1
 }
 
-pub fn (mut r Redis) type_of(key string) !KeyType {
-	res := r.send('TYPE "${key}"')!
-	if res.len > 6 {
-		return match res#[1..res.len - 2] {
-			'none' {
-				KeyType.t_none
-			}
-			'string' {
-				KeyType.t_string
-			}
-			'list' {
-				KeyType.t_list
-			}
-			'set' {
-				KeyType.t_set
-			}
-			'zset' {
-				KeyType.t_zset
-			}
-			'hash' {
-				KeyType.t_hash
-			}
-			'stream' {
-				KeyType.t_stream
-			}
-			else {
-				KeyType.t_unknown
-			}
-		}
-	} else {
-		return KeyType.t_unknown
-	}
+pub fn (mut r Redis) del(key string) !bool {
+	return r.to_int(r.send('DEL "${key}"')!) == 1
 }
 
-pub fn (mut r Redis) del(key string) !int {
-	res := r.send('DEL "${key}"')!
-	return res.int()
-}
-
-pub fn (mut r Redis) rename(key string, newkey string) bool {
-	res := r.send('RENAME "${key}" "${newkey}"') or { return false }
+pub fn (mut r Redis) rename(key string, newkey string) !bool {
+	res := r.send('RENAME "${key}" "${newkey}"')!
 	return res.starts_with(ok_flag)
 }
 
-pub fn (mut r Redis) renamenx(key string, newkey string) !int {
-	res := r.send('RENAMENX "${key}" "${newkey}"')!
-	r.check_err(res)!
-	return res.int()
+pub fn (mut r Redis) renamenx(key string, newkey string) !bool {
+	return r.to_int(r.send('RENAMENX "${key}" "${newkey}"')!) == 1
 }
 
-pub fn (mut r Redis) flushall() bool {
-	res := r.send('FLUSHALL') or { return false }
-	return res.starts_with(ok_flag)
+pub fn (mut r Redis) flushall() !bool {
+	return r.send('FLUSHALL')!.starts_with(ok_flag)
 }
 
-fn (mut r Redis) check_err(res string) ! {
+[inline]
+pub fn (mut r Redis) to_num_str(resp string) string {
+	return resp[1..]
+}
+
+fn (mut r Redis) check_err(res string) !string {
 	if res.len >= 5 && res.starts_with('-') {
 		return error(res[1..].trim_right('\r\n'))
 	} else if res.len >= 11 && res[0..10] == '-WRONGTYPE' {
 		return error(res[11..res.len - 2])
 	}
-	return
+	return res
 }

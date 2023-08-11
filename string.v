@@ -1,19 +1,23 @@
 module vredis
 
+[inline]
 pub fn (mut r Redis) incrby(key string, increment int) !int {
 	res := r.send('INCRBY "${key}" ${increment}')!
 	r.check_err(res)!
-	return res.int()
+	return r.to_num_str(res).int()
 }
 
+[inline]
 pub fn (mut r Redis) incr(key string) !int {
 	return r.incrby(key, 1)!
 }
 
+[inline]
 pub fn (mut r Redis) decr(key string) !int {
 	return r.incrby(key, -1)!
 }
 
+[inline]
 pub fn (mut r Redis) decrby(key string, decrement int) !int {
 	return r.incrby(key, -decrement)!
 }
@@ -25,32 +29,24 @@ pub fn (mut r Redis) incrbyfloat(key string, increment f64) !f64 {
 	return res.f64()
 }
 
+[inline]
 pub fn (mut r Redis) append(key string, value string) !int {
-	res := r.send('APPEND "${key}" "${value}"')!
-	return res.int()
+	return r.send('APPEND "${key}" "${value}"')!.int()
 }
 
+[inline]
 pub fn (mut r Redis) strlen(key string) !int {
-	res := r.send('STRLEN "${key}"')!
-	return res.int()
+	return r.send('STRLEN "${key}"')!.int()
 }
 
+[inline]
 pub fn (mut r Redis) get(key string) !string {
-	res := r.send('GET "${key}"')!
-	len := res.int()
-	if len == -1 {
-		return error('key not found')
-	}
-	return r.socket.read_line()[0..len]
+	return r.check_err(r.send('GET "${key}"')!)!
 }
 
+[inline]
 pub fn (mut r Redis) getset(key string, value string) !string {
-	res := r.send('GETSET "${key}" ${value}')!
-	len := res.int()
-	if len == -1 {
-		return ''
-	}
-	return r.socket.read_line()[0..len]
+	return r.check_err(r.send('GETSET "${key}" ${value}')!)!
 }
 
 pub fn (mut r Redis) getrange(key string, start int, end int) !string {
