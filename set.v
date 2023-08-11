@@ -81,9 +81,9 @@ pub fn (mut r Redis) sinter(key string, keys ...string) []string {
 	return r.multi_keys_handle('SINTER', key, keys)
 }
 
-pub fn (mut r Redis) sinterstore(key string, keys ...string) int {
-	return r.multi_keys_store_handle('SINTERSTORE', key, keys)
-}
+// pub fn (mut r Redis) sinterstore(key string, keys ...string) int {
+// 	return r.multi_keys_store_handle('SINTERSTORE', key, keys)
+// }
 
 pub struct ScanResult {
 	cursor u64
@@ -105,7 +105,7 @@ pub fn (mut r Redis) sscan(key string, cursor i64, opts SScanOpts) !ScanResult {
 	next_cursor := r.send(cmd)!
 	mut res := []string{cap: if opts.count > 0 { int(opts.count) } else { 10 }}
 	for {
-		line := r.read_reply(true)!
+		line := r.read_reply()!
 		if line.len == 0 {
 			break
 		}

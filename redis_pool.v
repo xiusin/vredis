@@ -9,9 +9,9 @@ type DialFn = fn () !Redis
 
 pub struct Pool {
 	sync.Once
-	test_on_borrow fn (Redis, time.Time) !
+	// test_on_borrow fn(Redis, time.Time)! = unsafe { nil }
 pub:
-	dial               DialFn
+	dial               DialFn = unsafe { nil }
 	max_idle           u32
 	max_active         int
 	idle_timeout       i64

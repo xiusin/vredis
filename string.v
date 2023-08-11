@@ -2,9 +2,7 @@ module vredis
 
 [inline]
 pub fn (mut r Redis) incrby(key string, increment int) !int {
-	res := r.send('INCRBY "${key}" ${increment}')!
-	r.check_err(res)!
-	return r.to_num_str(res).int()
+	return r.send('INCRBY "${key}" ${increment}')!.int()
 }
 
 [inline]
@@ -22,11 +20,9 @@ pub fn (mut r Redis) decrby(key string, decrement int) !int {
 	return r.incrby(key, -decrement)!
 }
 
+[inline]
 pub fn (mut r Redis) incrbyfloat(key string, increment f64) !f64 {
-	mut res := r.send('INCRBYFLOAT "${key}" ${increment}')!
-	r.check_err(res)!
-	res = r.socket.read_line()
-	return res.f64()
+	return r.send('INCRBYFLOAT "${key}" ${increment}')!.f64()
 }
 
 [inline]
@@ -41,22 +37,17 @@ pub fn (mut r Redis) strlen(key string) !int {
 
 [inline]
 pub fn (mut r Redis) get(key string) !string {
-	return r.check_err(r.send('GET "${key}"')!)!
+	return r.send('GET "${key}"')!
 }
 
 [inline]
 pub fn (mut r Redis) getset(key string, value string) !string {
-	return r.check_err(r.send('GETSET "${key}" ${value}')!)!
+	return r.send('GETSET "${key}" ${value}')!
 }
 
+[inline]
 pub fn (mut r Redis) getrange(key string, start int, end int) !string {
-	res := r.send('GETRANGE "${key}" ${start} ${end}')!
-	len := res.int()
-	if len == 0 {
-		r.socket.read_line()
-		return ''
-	}
-	return r.socket.read_line()[0..len]
+	return r.send('GETRANGE "${key}" ${start} ${end}')!
 }
 
 pub fn (mut r Redis) setnx(key string, value string) int {
@@ -84,12 +75,12 @@ pub fn (mut r Redis) set(key string, value string) bool {
 
 pub fn (mut r Redis) setbit(key string, offset int, value u8) bool {
 	res := r.send('SETBIT "${key}" ${offset} ${value}') or { return false }
-	return res in [':0', ':1']
+	return res in ['0', '1']
 }
 
 pub fn (mut r Redis) getbit(key string, offset int) u8 {
 	res := r.send('GETBIT "${key}" ${offset}') or { return 0 }
-	return res.trim_left(':').u8()
+	return res.u8()
 }
 
 pub fn (mut r Redis) mget(key string, keys ...string) map[string]string {
@@ -124,6 +115,11 @@ pub fn (mut r Redis) set_opts(key string, value string, opts SetOpts) bool {
 	keep_ttl := if opts.keep_ttl == false { '' } else { ' KEEPTTL' }
 	res := r.send('SET "${key}" "${value}"${ex}${nx}${keep_ttl}') or { return false }
 	return res.starts_with(ok_flag)
+}
+
+[inline]
+pub fn (mut r Redis) keys(pattern string) ![]string {
+	return r.send("KEYS ${pattern}")!.split("\r\n")
 }
 
 pub fn (mut r Redis) psetex(key string, millis int, value string) bool {

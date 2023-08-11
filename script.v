@@ -11,7 +11,6 @@ pub fn (mut r Redis) eval(script string, num_keys int, keys_and_args ...string) 
 		return error('keys_and_args.len != ${num_keys}')
 	}
 	line := r.send('EVAL "${script}" ${num_keys} ${keys_and_args.join(' ')}')!.trim_right('\r\n')
-	r.check_err(line)!
 	return line
 }
 
@@ -20,7 +19,6 @@ pub fn (mut r Redis) evalsha(sha1 string, num_keys int, keys_and_args ...string 
 		return error('keys_and_args.len != ${num_keys}')
 	}
 	line := r.send('EVALSHA "${sha1}" ${num_keys} ${keys_and_args.join(' ')}')!.trim_right('\r\n')
-	r.check_err(line)!
 	return line
 }
 

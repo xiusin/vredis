@@ -6,34 +6,24 @@ fn test_hash()! {
 		redis.close() or {}
 	}
 
-	println(redis.randomkey()!)
+	assert redis.flushall()!
 
-	// redis.set('name', 'xiusin')
-	// redis.set('age', '18')
-	// redis.hset('website', 'baidu1', 'www.baidu.com111')
-	// redis.hset('website', 'baidu4', 'www.baidu.com444')
-	// println('hlen = ${redis.hlen('website')}')
-	// println( 'hkeys = ${redis.hkeys('website')}')
-	// println( 'hexits = ${redis.hexists('website', 'baidu')}')
-	// println( 'hexits = ${redis.hexists('website', 'baidu1')}')
-	// println( 'hget = ${redis.hget('website', 'baidu1')!}')
-	// println('hgetall = ${redis.hgetall('website')!}')
-	// println('sadd = ${redis.sadd('names', 'zhangsan', 'li si', 'wang W')}')
-	// println('SCARD = ${redis.scard('names')}')
-	// println('sismember = ${redis.sismember('names', 'zhangsan')}')
-	// println('srandmember = ${redis.srandmember('names', 2)}')
-	// println(redis.mget('name', 'age', 'address'))
-	// println(redis.hincrby('website', 'num', 1)!)
-
-	// println('hvals = ${redis.hvals('website')}')
-	// redis.hdel('website', 'num')
-	// println('hvals = ${redis.hvals('website')}')
-
-	// println(redis)
-	// redis.send('GET name')!
-	// println(redis.ping()!)
-	// redis.set("name", "xiusin")
-	// println(redis.send('GET name')!)
-	// os.write_file("info.log", redis.send("INFO")!)!
-
+	assert redis.hset('website', 'api', 'api.vlang.io')
+	assert redis.hset('website', 'www', 'www.vlang.io')
+	assert redis.hset('website', 'vpm', 'vpm.vlang.io')
+	assert redis.hlen('website')! == 3
+	assert redis.hexists('website', 'api')
+	assert redis.hexists('website', 'vpc') == false
+	assert redis.hkeys('website')!.str() == "['api', 'www', 'vpm']"
+	assert redis.hget('website', 'api')! == 'api.vlang.io'
+	assert redis.hgetall('website')!.str() == "{'api': 'api.vlang.io', 'www': 'www.vlang.io', 'vpm': 'vpm.vlang.io'}"
+	assert redis.hdel('website', 'api', 'doc')
+	assert redis.hdel('website', 'api', 'doc') == false
+	assert redis.hincrby('website', 'counter', 1)! == 1
+	assert redis.hincrbyfloat('website', 'counter', 1.1)! == 2.1
+	assert redis.hsetnx('website', 'doc', 'doc.vlang.io') == true
+	assert redis.hsetnx('website', 'doc', 'doc.vlang.io') == false
+	assert redis.hvals('website')!.len == 4
+	assert redis.hmget('website', 'doc', 'api')!.len == 2
+	assert redis.hmset('website', 'v1', 'v1.vlang.io', 'v2', 'v2.vlang.io')!
 }

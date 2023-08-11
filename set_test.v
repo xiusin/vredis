@@ -1,10 +1,10 @@
 module vredis
 
 fn test_set()! {
-	mut redis_scribe := new_client(host: '124.222.103.232', port: 6379, requirepass: 'yuAU702G!!')!
-	redis_scribe.subscribe('messages')!
-
-	println('end')
+	// mut redis_scribe := new_client(host: '124.222.103.232', port: 6379, requirepass: 'yuAU702G!!')!
+	// redis_scribe.subscribe('messages')!
+	//
+	// println('end')
 	// for i in 0 .. 1000 {
 	// 	redis.sadd('sets', 'v${i + 30}')
 	// }
