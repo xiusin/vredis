@@ -1,6 +1,6 @@
 module vredis
 
-fn test_eval() ! {
+fn test_script() ! {
 	multi_str := 'a
 
 b

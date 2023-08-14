@@ -164,6 +164,11 @@ pub fn (mut r Redis) del(key string) !bool {
 }
 
 [inline]
+pub fn (mut r Redis) unlink(key string) !bool {
+	return r.send('UNLINK', key)!.int() == 1
+}
+
+[inline]
 pub fn (mut r Redis) rename(key string, newkey string) !bool {
 	return r.send('RENAME', key, newkey)!.starts_with(vredis.ok_flag)
 }
