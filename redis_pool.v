@@ -28,6 +28,7 @@ mut:
 	idle_conns     datatypes.LinkedList[ActiveRedisConn] = datatypes.LinkedList[ActiveRedisConn]{}
 }
 
+
 fn (mut p Pool) str() string {
 	p.mu.@lock()
 	defer {
