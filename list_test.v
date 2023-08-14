@@ -5,6 +5,7 @@ fn test_list()! {
 	defer {
 		redis.close() or {}
 	}
+
 	assert redis.flushall()!
 	assert redis.lpush('list', 'v2', 'v1')! == 2
 	assert redis.rpush('list', 'v3', 'v4')! == 4

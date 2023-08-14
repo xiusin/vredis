@@ -9,9 +9,19 @@ fn test_string() ! {
 
 	assert redis.flushall()!
 
+	multi_key := 'api
+domain'
+	multi_str := 'api."
+vlang.
+io'
+
+	assert redis.set(multi_key, multi_str)!
+	assert redis.get(multi_key)! == multi_str
+
 	assert redis.ping()! == true
 	assert redis.@type("website")! == 'none'
-	assert redis.set('website', 'www')
+	assert redis.del(multi_key)!
+	assert redis.set('website', 'www')!
 	assert redis.randomkey()! == 'website'
 	assert redis.@type("website")! == 'string'
 	assert redis.ttl('website')! == -1
@@ -33,7 +43,7 @@ fn test_string() ! {
 	assert redis.getset('exists', 'exists')! == 'exists'
 	assert redis.setrange('exists', 0, "mo")! == 6
 	assert redis.get('exists')! == 'moists'
-	assert redis.mget('exists').str() == "{'exists': 'moists'}"
+	assert redis.mget('exists')!.str() == "{'exists': 'moists'}"
 	assert redis.keys('*')!.len == 3
 	assert redis.rename('exists', '_exists')!
 	assert redis.exists('exists')! == false
@@ -46,7 +56,7 @@ fn test_string() ! {
 	assert redis.pttl('website')! == -1
 	assert redis.renamenx('_exists', 'website')! == false
 	assert redis.renamenx('_exists', 'exists')!
-	assert redis.setbit('bits', 0,  1)
+	assert redis.setbit('bits', 0,  1)!
 	assert redis.getbit('bits', 0) == 1
 	assert redis.getbit('bits', 1) == 0
 
