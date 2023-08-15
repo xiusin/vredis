@@ -2,7 +2,7 @@ module vredis
 
 import time
 
-fn test_pool() {
+fn test_pool() ! {
 	mut pool := new_pool(
 		dial: fn () !&Redis {
 			return new_client()!
@@ -12,7 +12,7 @@ fn test_pool() {
 		test_on_borrow: fn (mut conn ActiveRedisConn) ! {
 			conn.ping()!
 		}
-	)
+	)!
 
 	mut client := pool.get()!
 	mut client1 := pool.get()!

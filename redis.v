@@ -13,7 +13,6 @@ pub struct ConnOpts {
 	host          string = '127.0.0.1'
 	username      string
 	requirepass   string
-	db            int
 }
 
 const ok_flag = 'OK'
@@ -102,12 +101,6 @@ pub fn new_client(opts ConnOpts) !&Redis {
 		}
 	}
 
-	if opts.db > 0 {
-		if !client.send('SELECT', opts.db)!.starts_with(vredis.ok_flag) {
-			return error('switch db failed')
-		}
-	}
-
 	return client
 }
 
@@ -117,6 +110,7 @@ pub fn (mut r Redis) close() ! {
 		r.unlock()
 	}
 
+	_ = r.send('QUIT') or { '' }
 	r.socket.close()!
 }
 
@@ -198,4 +192,46 @@ pub fn (mut r Redis) renamenx(key string, newkey string) !bool {
 [inline]
 pub fn (mut r Redis) flushall() !bool {
 	return r.send('FLUSHALL')!.starts_with(vredis.ok_flag)
+}
+
+[inline]
+pub fn (mut r Redis) flushdb() !bool {
+	return r.send('FLUSHDB')!.starts_with(vredis.ok_flag)
+}
+
+[inline]
+pub fn (mut r Redis) @select(db u32) !bool {
+	return r.send('SELECT', int(db))!.starts_with(vredis.ok_flag)
+}
+
+[inline]
+pub fn (mut r Redis) dbsize() !int {
+	return r.send('DBSIZE')!.int()
+}
+
+[inline]
+pub fn (mut r Redis) move(key string, db u32) !bool {
+	return r.send('MOVE', key, int(db))!.starts_with(vredis.ok_flag)
+}
+
+pub fn (mut r Redis) scan(opts ScanOpts) !ScanReply {
+	mut args := [CmdArg(opts.cursor)]
+
+	if opts.pattern.len > 0 {
+		args << 'MATCH'
+		args << opts.pattern
+	}
+	if opts.count > 0 {
+		args << 'COUNT'
+		args << opts.count
+	}
+
+	next_cursor, members := r.send('SCAN', ...args)!.split_once('\r\n') or {
+		return error('error msg')
+	}
+
+	return ScanReply{
+		cursor: next_cursor.u64()
+		result: members.split('\r\n')
+	}
 }
