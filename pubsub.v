@@ -14,7 +14,11 @@ pub fn (mut r Redis) subscribe(channels []string, cb fn (string)) ! {
 	// 	select {
 	// 		ctx.done() {  }
 	// 	}
-	// 	cb(r.read_reply()!)
+	r.socket.write('SUBSCRIBE ${channels.join(' ')}'.bytes())!
+	// cb(r.read_reply()!)
+	r.read_reply()!
+
+	print('end')
 	// }
 }
 

@@ -1,19 +1,32 @@
 module vredis
 
+import time
+
 fn test_pool() {
-	// mut pool := &Pool{
-	// 	max_idle: 0
-	// 	max_active: 0
-	// 	dial: fn () !Redis {
-	// 		return new_client()!
-	// 	}
-	// }
-	//
-	// mut client := pool.get()!
-	// client.close()!
-	//
-	// client = pool.get()!
-	// println(pool)
-	//
-	// println('active cnt: ${pool.active_cnt()}')
+	mut pool := new_pool(
+		dial: fn () !&Redis {
+			return new_client()!
+		}
+		max_active: 2
+		max_conn_life_time: 1
+		test_on_borrow: fn (mut conn ActiveRedisConn) ! {
+			conn.ping()!
+		}
+	)
+
+	mut client := pool.get()!
+	mut client1 := pool.get()!
+
+	pool.get() or { assert err == err_pool_exhausted }
+
+	client.release()
+	assert client == pool.get()!
+
+	assert client != client1
+
+	client1.release()
+
+	time.sleep(time.second)
+
+	assert client1 != pool.get()!
 }

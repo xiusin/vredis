@@ -23,7 +23,7 @@ pub fn (mut arg CmdArg) safe() CmdArg {
 	} else if arg is u64 {
 		cmd_arg_str = (arg as u64).str()
 	} else {
-		cmd_arg_str = arg.str().trim_string_left("vredis.CmdArgs(").trim_right(")")
+		cmd_arg_str = arg.str()
 	}
 	return cmd_arg_str
 }

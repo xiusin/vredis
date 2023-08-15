@@ -6,8 +6,8 @@ import sync
 
 [params]
 pub struct ConnOpts {
-	read_timeout  time.Duration
-	write_timeout time.Duration
+	read_timeout  time.Duration = time.second * 10
+	write_timeout time.Duration = time.second * 10
 	name          string
 	port          int    = 6379
 	host          string = '127.0.0.1'
@@ -21,11 +21,11 @@ const ok_flag = 'OK'
 pub struct Redis {
 	sync.Mutex
 mut:
-	socket      &net.TcpConn = unsafe { nil }
-	prev_cmd    string
-	debug       bool
-	protocol    &Protocol = unsafe { nil }
-	pub_sub_chan chan string
+	is_active bool = true
+	socket    &net.TcpConn = unsafe { nil }
+	prev_cmd  string
+	debug     bool
+	protocol  &Protocol = unsafe { nil }
 }
 
 pub struct SetOpts {
@@ -48,6 +48,16 @@ pub fn (mut r Redis) send(cmd string, params ...CmdArg) !string {
 		r.unlock()
 	}
 
+	if !r.is_active {
+		return err_conn_no_active
+	}
+
+	// 从对象池内获取一个对象
+	// mut client := r.pool.get()!
+	// defer {
+	// 	r.pool.put(client) or {}
+	// }
+
 	mut args := CmdArgs([]CmdArg{})
 	args.add(CmdArg(cmd))
 	args.add(...params)
@@ -65,12 +75,20 @@ fn (mut r Redis) read_reply() !string {
 	return string(r.protocol.read_reply()!.bytestr())
 }
 
-pub fn new_client(opts ConnOpts) !Redis {
-	mut client := Redis{
+pub fn new_client(opts ConnOpts) !&Redis {
+	mut client := &Redis{
 		socket: net.dial_tcp('${opts.host}:${opts.port}')!
 	}
 
-	client.protocol = new_protocol(&client)
+	if opts.read_timeout > 0 {
+		client.socket.set_read_timeout(opts.read_timeout)
+	}
+
+	if opts.write_timeout > 0 {
+		client.socket.set_write_timeout(opts.write_timeout)
+	}
+
+	client.protocol = new_protocol(client)
 
 	if opts.requirepass.len > 0 {
 		if !client.send('AUTH', opts.requirepass)!.starts_with(vredis.ok_flag) {
@@ -90,7 +108,6 @@ pub fn new_client(opts ConnOpts) !Redis {
 		}
 	}
 
-	client.pub_sub_chan = chan string{}
 	return client
 }
 
@@ -99,7 +116,7 @@ pub fn (mut r Redis) close() ! {
 	defer {
 		r.unlock()
 	}
-	r.pub_sub_chan.close()
+
 	r.socket.close()!
 }
 
