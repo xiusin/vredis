@@ -26,6 +26,24 @@ Once you have successfully connected, you can send commands using the `send()` m
 ```vlang
 redis := vredis.new_client(host: '127.0.0.1', port: 6379, db: 1, name: 'vclient', requirepass: '')
 
+// or pool
+mut pool := new_pool(
+	dial: fn () !&Redis {
+		return new_client()!
+	}
+	max_active: 2
+	max_conn_life_time: 1
+	test_on_borrow: fn (mut conn ActiveRedisConn) ! {
+		conn.ping()!
+	}
+)
+
+mut redis := pool.get()!
+defer {
+    redis.release() // You must execute this function, otherwise it will result in a memory leak.
+}
+
+
 redis.set("mykey", "hello")!
 redis.keys('*')!
 redis.del('mykey')!
@@ -41,6 +59,8 @@ Finally, when you are finished with the connection, use the close() method to cl
 
 ```vlang
 redis.close()
+// or
+redis.release() // pool mode
 ```
 
 # Contributing
