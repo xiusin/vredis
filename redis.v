@@ -15,8 +15,6 @@ pub struct ConnOpts {
 	requirepass   string
 }
 
-const ok_flag = 'OK'
-
 pub struct Redis {
 	sync.Mutex
 mut:
@@ -41,7 +39,7 @@ fn (mut r Redis) str() string {
 }'
 }
 
-pub fn (mut r Redis) send(cmd string, params ...CmdArg) !string {
+pub fn (mut r Redis) send(cmd string, params ...CmdArg) !&Reply {
 	r.@lock()
 	defer {
 		r.unlock()
@@ -51,27 +49,20 @@ pub fn (mut r Redis) send(cmd string, params ...CmdArg) !string {
 		return err_conn_no_active
 	}
 
-	// 从对象池内获取一个对象
-	// mut client := r.pool.get()!
-	// defer {
-	// 	r.pool.put(client) or {}
-	// }
-
 	mut args := CmdArgs([]CmdArg{})
 	args.add(CmdArg(cmd))
 	args.add(...params)
 	r.write_string_to_socket(args.build())!
-	return r.read_reply()!
+
+	return &Reply{
+		data: r.protocol.read_reply()!
+	}
 }
 
 pub fn (mut r Redis) write_string_to_socket(cmd string) ! {
 	r.prev_cmd = cmd
 	println('-> ${cmd}')
 	r.socket.write_string(cmd)!
-}
-
-fn (mut r Redis) read_reply() !string {
-	return string(r.protocol.read_reply()!.bytestr())
 }
 
 pub fn new_client(opts ConnOpts) !&Redis {
@@ -90,13 +81,13 @@ pub fn new_client(opts ConnOpts) !&Redis {
 	client.protocol = new_protocol(client)
 
 	if opts.requirepass.len > 0 {
-		if !client.send('AUTH', opts.requirepass)!.starts_with(vredis.ok_flag) {
+		if !client.send('AUTH', opts.requirepass)!.ok() {
 			return error('auth password failed')
 		}
 	}
 
 	if opts.name != '' {
-		if !client.send('CLIENT', 'SETNAME', opts.name)!.starts_with(vredis.ok_flag) {
+		if !client.send('CLIENT', 'SETNAME', opts.name)!.ok() {
 			return error('set client name failed')
 		}
 	}
@@ -110,38 +101,38 @@ pub fn (mut r Redis) close() ! {
 		r.unlock()
 	}
 
-	_ = r.send('QUIT') or { '' }
+	r.send('QUIT')!
 	r.socket.close()!
 }
 
 [inline]
 pub fn (mut r Redis) ping() !bool {
-	return r.send('PING')! == 'PONG'
+	return r.send('PING')!.@is('PONG')
 }
 
 [inline]
 pub fn (mut r Redis) @type(key string) !string {
-	return r.send('TYPE', key)!
+	return r.send('TYPE', key)!.bytestr()
 }
 
 [inline]
 pub fn (mut r Redis) expire(key string, seconds int) !bool {
-	return r.send('EXPIRE', key, seconds)!.int() == 1
+	return r.send('EXPIRE', key, seconds)!.@is(1)
 }
 
 [inline]
 pub fn (mut r Redis) pexpire(key string, millis int) !bool {
-	return r.send('PEXPIRE', key, millis)!.int() == 1
+	return r.send('PEXPIRE', key, millis)!.@is(1)
 }
 
 [inline]
 pub fn (mut r Redis) expireat(key string, timestamp int) !bool {
-	return r.send('EXPIREAT', key, timestamp)!.int() == 1
+	return r.send('EXPIREAT', key, timestamp)!.@is(1)
 }
 
 [inline]
 pub fn (mut r Redis) pexpireat(key string, millistimestamp int) !bool {
-	return r.send('PEXPIREAT', key, millistimestamp)!.int() == 1
+	return r.send('PEXPIREAT', key, millistimestamp)!.@is(1)
 }
 
 [inline]
@@ -151,7 +142,7 @@ pub fn (mut r Redis) persist(key string) !int {
 
 [inline]
 pub fn (mut r Redis) randomkey() !string {
-	return r.send('RANDOMKEY')!
+	return r.send('RANDOMKEY')!.bytestr()
 }
 
 [inline]
@@ -166,42 +157,42 @@ pub fn (mut r Redis) pttl(key string) !int {
 
 [inline]
 pub fn (mut r Redis) exists(key string) !bool {
-	return r.send('EXISTS', key)!.int() == 1
+	return r.send('EXISTS', key)!.@is(1)
 }
 
 [inline]
 pub fn (mut r Redis) del(key string) !bool {
-	return r.send('DEL', key)!.int() == 1
+	return r.send('DEL', key)!.@is(1)
 }
 
 [inline]
 pub fn (mut r Redis) unlink(key string) !bool {
-	return r.send('UNLINK', key)!.int() == 1
+	return r.send('UNLINK', key)!.@is(1)
 }
 
 [inline]
 pub fn (mut r Redis) rename(key string, newkey string) !bool {
-	return r.send('RENAME', key, newkey)!.starts_with(vredis.ok_flag)
+	return r.send('RENAME', key, newkey)!.ok()
 }
 
 [inline]
 pub fn (mut r Redis) renamenx(key string, newkey string) !bool {
-	return r.send('RENAMENX', key, newkey)!.int() == 1
+	return r.send('RENAMENX', key, newkey)!.@is(1)
 }
 
 [inline]
 pub fn (mut r Redis) flushall() !bool {
-	return r.send('FLUSHALL')!.starts_with(vredis.ok_flag)
+	return r.send('FLUSHALL')!.ok()
 }
 
 [inline]
 pub fn (mut r Redis) flushdb() !bool {
-	return r.send('FLUSHDB')!.starts_with(vredis.ok_flag)
+	return r.send('FLUSHDB')!.ok()
 }
 
 [inline]
 pub fn (mut r Redis) @select(db u32) !bool {
-	return r.send('SELECT', int(db))!.starts_with(vredis.ok_flag)
+	return r.send('SELECT', int(db))!.ok()
 }
 
 [inline]
@@ -211,7 +202,7 @@ pub fn (mut r Redis) dbsize() !int {
 
 [inline]
 pub fn (mut r Redis) move(key string, db u32) !bool {
-	return r.send('MOVE', key, int(db))!.starts_with(vredis.ok_flag)
+	return r.send('MOVE', key, int(db))!.ok()
 }
 
 pub fn (mut r Redis) scan(opts ScanOpts) !ScanReply {
@@ -226,12 +217,12 @@ pub fn (mut r Redis) scan(opts ScanOpts) !ScanReply {
 		args << opts.count
 	}
 
-	next_cursor, members := r.send('SCAN', ...args)!.split_once('\r\n') or {
+	next_cursor, members := r.send('SCAN', ...args)!.data().bytestr().split_once(crlf) or {
 		return error('error msg')
 	}
 
 	return ScanReply{
 		cursor: next_cursor.u64()
-		result: members.split('\r\n')
+		result: members.split(crlf)
 	}
 }

@@ -29,8 +29,8 @@ pub fn (mut r Redis) sismember(key string, value string) !bool {
 	return r.send('SISMEMBER', key, value)!.int() == 1
 }
 
-pub fn (mut r Redis) spop(key string) string {
-	return r.send('SPOP', key) or { '(nil)' }
+pub fn (mut r Redis) spop(key string) !string {
+	return r.send('SPOP', key)!.bytestr()
 }
 
 pub fn (mut r Redis) smove(source string, destination string, member string) !bool {
@@ -39,9 +39,9 @@ pub fn (mut r Redis) smove(source string, destination string, member string) !bo
 
 pub fn (mut r Redis) srandmember(key string, cnt ...int) ![]string {
 	count := if cnt.len > 0 { cnt[0] } else { 1 }
-	ret := r.send('SRANDMEMBER', key, count)!
+	ret := r.send('SRANDMEMBER', key, count)!.data().bytestr()
 	return if ret.len > 0 {
-		ret.split('\r\n')
+		ret.split(crlf)
 	} else {
 		[]string{}
 	}
@@ -63,7 +63,7 @@ fn (mut r Redis) multi_keys_handle(cmd string, key string, keys []string) ![]str
 		args << it
 	}
 
-	return r.send('${cmd}', ...args)!.split('\r\n')
+	return r.send('${cmd}', ...args)!.strings()
 }
 
 fn (mut r Redis) multi_keys_store_handle(cmd string, key string, keys []string) !int {
@@ -96,7 +96,7 @@ pub fn (mut r Redis) sinter(key string, keys ...string) ![]string {
 }
 
 pub fn (mut r Redis) smembers(key string) ![]string {
-	return r.send('SMEMBERS', key)!.split('\r\n')
+	return r.send('SMEMBERS', key)!.strings()
 }
 
 pub fn (mut r Redis) sinterstore(key string, keys ...string) !int {
@@ -115,11 +115,11 @@ pub fn (mut r Redis) sscan(key string, opts ScanOpts) !ScanReply {
 		args << opts.count
 	}
 
-	next_cursor, members := r.send('SSCAN', ...args)!.split_once('\r\n') or {
+	next_cursor, members := r.send('SSCAN', ...args)!.data().bytestr().split_once(crlf) or {
 		return error('error msg')
 	}
 	return ScanReply{
 		cursor: next_cursor.u64()
-		result: members.split('\r\n')
+		result: members.split(crlf)
 	}
 }

@@ -1,6 +1,6 @@
 module vredis
 
-fn test_hash()! {
+fn test_hash() ! {
 	mut redis := new_client()!
 	defer {
 		redis.close() or {}
@@ -14,9 +14,9 @@ fn test_hash()! {
 	assert redis.hlen('website')! == 3
 	assert redis.hexists('website', 'api')!
 	assert redis.hexists('website', 'vpc')! == false
-	assert redis.hkeys('website')!.str() == "['api', 'www', 'vpm']"
+	assert redis.hkeys('website')!.bytestr() == "['api', 'www', 'vpm']"
 	assert redis.hget('website', 'api')! == 'api.vlang.io'
-	assert redis.hgetall('website')!.str() == "{'api': 'api.vlang.io', 'www': 'www.vlang.io', 'vpm': 'vpm.vlang.io'}"
+	assert redis.hgetall('website')!.bytestr() == "{'api': 'api.vlang.io', 'www': 'www.vlang.io', 'vpm': 'vpm.vlang.io'}"
 	assert redis.hdel('website', 'api', 'doc')!
 	assert redis.hdel('website', 'api', 'doc')! == false
 	assert redis.hincrby('website', 'counter', 1)! == 1

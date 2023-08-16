@@ -9,10 +9,10 @@ pub fn (mut r Redis) eval(script string, num_keys int, keys_and_args ...string) 
 		args << it
 	}
 
-	return r.send('EVAL', ...args)!.trim_right('\r\n')
+	return r.send('EVAL', ...args)!.bytestr().trim_right(crlf)
 }
 
-pub fn (mut r Redis) evalsha(sha1 string, num_keys int, keys_and_args ...string )!string {
+pub fn (mut r Redis) evalsha(sha1 string, num_keys int, keys_and_args ...string) !string {
 	if keys_and_args.len < num_keys {
 		return error('keys_and_args.len != ${num_keys}')
 	}
@@ -21,20 +21,19 @@ pub fn (mut r Redis) evalsha(sha1 string, num_keys int, keys_and_args ...string 
 	for it in keys_and_args {
 		args << it
 	}
-	line := r.send('EVALSHA', ...args)!.trim_right('\r\n')
-	return line
+	return r.send('EVALSHA', ...args)!.bytestr()
 }
 
 pub fn (mut r Redis) script_load(script string) !string {
-	return r.send('SCRIPT', 'LOAD', script)!.trim_right('\r\n')
+	return r.send('SCRIPT', 'LOAD', script)!.bytestr()
 }
 
 pub fn (mut r Redis) script_kill() !bool {
-	return r.send('SCRIPT', 'KILL')!.starts_with(ok_flag)
+	return r.send('SCRIPT', 'KILL')!.ok()
 }
 
 pub fn (mut r Redis) script_flush() !bool {
-	return r.send('SCRIPT', ' FLUSH')!.starts_with(ok_flag)
+	return r.send('SCRIPT', ' FLUSH')!.ok()
 }
 
 pub fn (mut r Redis) script_exists(sha string, shas ...string) !map[string]bool {
@@ -43,7 +42,7 @@ pub fn (mut r Redis) script_exists(sha string, shas ...string) !map[string]bool 
 		args << it
 	}
 
-	res_arr := r.send('SCRIPT', ...args)!.split('\r\n')
+	res_arr := r.send('SCRIPT', ...args)!.strings()
 	mut result := map[string]bool{}
 	for i := 1; i < args.len; i++ {
 		result[args[i] as string] = res_arr[i].u8() == 1

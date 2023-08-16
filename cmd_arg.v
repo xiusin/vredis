@@ -47,6 +47,6 @@ pub fn (mut args CmdArgs) build() string {
 		buf.write_string(' ')
 	}
 	buf.delete_last()
-	buf.write_string('\r\n')
+	buf.write_string(crlf)
 	return buf.str()
 }

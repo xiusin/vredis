@@ -43,7 +43,7 @@ io'
 	assert redis.getset('exists', 'exists')! == 'exists'
 	assert redis.setrange('exists', 0, 'mo')! == 6
 	assert redis.get('exists')! == 'moists'
-	assert redis.mget('exists')!.str() == "{'exists': 'moists'}"
+	assert redis.mget('exists')!.bytestr() == "{'exists': 'moists'}"
 	assert redis.keys('*')!.len == 3
 	assert redis.rename('exists', '_exists')!
 	assert redis.exists('exists')! == false

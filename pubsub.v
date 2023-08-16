@@ -8,7 +8,7 @@ pub fn (mut r Redis) subscribe(channels []string, cb fn (string)) ! {
 		r.unlock()
 	}
 	mut f := os.open_append('subscribe.log')!
-	f.write_string('SUBSCRIBE ${channels.join(' ')} \r\n')!
+	f.write_string('SUBSCRIBE ${channels.join(' ')} ${crlf}')!
 	r.socket.write('SUBSCRIBE ${channels.join(' ')}'.bytes())!
 	// for {
 	// 	select {
@@ -16,7 +16,7 @@ pub fn (mut r Redis) subscribe(channels []string, cb fn (string)) ! {
 	// 	}
 	r.socket.write('SUBSCRIBE ${channels.join(' ')}'.bytes())!
 	// cb(r.read_reply()!)
-	r.read_reply()!
+	// r.read_reply()!
 
 	print('end')
 	// }

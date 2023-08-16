@@ -15,7 +15,7 @@ d'
 
 	redis.flushall()!
 
-	println(redis.eval("return {1,2,{3,'hello world'}}", 0)!.split('\r\n'))  // no support
+	println(redis.eval("return {1,2,{3,'hello world'}}", 0)!.strings()) // no support
 
 	// assert redis.eval('return 10', 0)! == '10'
 	// println(redis.eval("return {1, 2}", 0)!.split('\r\n'))
@@ -42,5 +42,4 @@ d'
 	// }
 	// redis.script_flush()
 	// println(redis.script_exists(sha))
-
 }

@@ -14,14 +14,15 @@ fn new_protocol(client &Redis) &Protocol {
 fn (mut p Protocol) read_reply(is_sub ...bool) ![]u8 {
 	mut data := p.client.socket.read_line().bytes()
 
-	println('<- ${data.bytestr()}')
+	if p.client.debug {
+		println('<- ${data.bytestr()}')
+	}
 
 	// only top read delete
 	if is_sub.len == 0 || !is_sub[0] {
 		data.delete_last()
 		data.delete_last()
 	}
-
 
 	match data[0..1].bytestr() {
 		'-' { // error
@@ -59,7 +60,7 @@ fn (mut p Protocol) read_reply(is_sub ...bool) ![]u8 {
 			data.clear()
 			for i := 0; i < line_num; i++ {
 				if i > 0 {
-					data << '\r\n'.bytes()
+					data << crlf.bytes()
 				}
 				data << p.read_reply()!
 			}

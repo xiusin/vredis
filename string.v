@@ -37,17 +37,17 @@ pub fn (mut r Redis) strlen(key string) !int {
 
 [inline]
 pub fn (mut r Redis) get(key string) !string {
-	return r.send('GET', key)!
+	return r.send('GET', key)!.bytestr()
 }
 
 [inline]
 pub fn (mut r Redis) getset(key string, value string) !string {
-	return r.send('GETSET', key, value)!
+	return r.send('GETSET', key, value)!.bytestr()
 }
 
 [inline]
 pub fn (mut r Redis) getrange(key string, start int, end int) !string {
-	return r.send('GETRANGE', key, start, end)!
+	return r.send('GETRANGE', key, start, end)!.bytestr()
 }
 
 pub fn (mut r Redis) setnx(key string, value string) !bool {
@@ -67,17 +67,15 @@ pub fn (mut r Redis) setex(key string, seconds int, value string) !bool {
 }
 
 pub fn (mut r Redis) set(key string, value string) !bool {
-	return r.send('SET', key, value)!.starts_with(ok_flag)
+	return r.send('SET', key, value)!.ok()
 }
 
 pub fn (mut r Redis) setbit(key string, offset int, value int) !bool {
-	ret := r.send('SETBIT', key, offset, value)!
-	return ret  in ['0', '1']
+	return r.send('SETBIT', key, offset, value)!.@is(1)
 }
 
-pub fn (mut r Redis) getbit(key string, offset int) int {
-	res := r.send('GETBIT', key, offset) or { return 0 }
-	return res.int()
+pub fn (mut r Redis) getbit(key string, offset int) !int {
+	return r.send('GETBIT', key, offset)!.int()
 }
 
 pub fn (mut r Redis) mget(key string, keys ...string) !map[string]string {
@@ -87,8 +85,7 @@ pub fn (mut r Redis) mget(key string, keys ...string) !map[string]string {
 	}
 
 	mut data := map[string]string{}
-	res := r.send('MGET', ...args)!
-	vals := res.split('\r\n')
+	vals := r.send('MGET', ...args)!.strings()
 
 	for i := 0; i < args.len; i++ {
 		data[args[i] as string] = vals[i]
@@ -118,13 +115,12 @@ pub fn (mut r Redis) set_opts(key string, value string, opts SetOpts) !bool {
 	args << nx
 	args << keep_ttl
 
-	res := r.send('SET', ...args) or { return false }
-	return res.starts_with(ok_flag)
+	return r.send('SET', ...args)!.ok()
 }
 
 [inline]
 pub fn (mut r Redis) keys(pattern string) ![]string {
-	return r.send('KEYS', pattern)!.split('\r\n')
+	return r.send('KEYS', pattern)!.strings()
 }
 
 pub fn (mut r Redis) psetex(key string, millis int, value string) !bool {

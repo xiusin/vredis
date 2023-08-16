@@ -24,15 +24,15 @@ pub fn (mut r Redis) rpush(key string, value string, values ...string) !int {
 }
 
 pub fn (mut r Redis) lpop(key string) !string {
-	return r.send('LPOP', key)!
+	return r.send('LPOP', key)!.bytestr()
 }
 
 pub fn (mut r Redis) rpop(key string) !string {
-	return r.send('RPOP', key)!
+	return r.send('RPOP', key)!.bytestr()
 }
 
 pub fn (mut r Redis) lset(key string, index i64, value string) !bool {
-	return r.send('LSET', key, index, value)!.starts_with(ok_flag)
+	return r.send('LSET', key, index, value)!.ok()
 }
 
 pub fn (mut r Redis) llen(key string) !int {
@@ -40,7 +40,7 @@ pub fn (mut r Redis) llen(key string) !int {
 }
 
 pub fn (mut r Redis) lindex(key string, index int) !string {
-	return r.send('LINDEX', key, index)!
+	return r.send('LINDEX', key, index)!.bytestr()
 }
 
 pub fn (mut r Redis) lrem(key string, count int, value string) !int {
@@ -48,11 +48,11 @@ pub fn (mut r Redis) lrem(key string, count int, value string) !int {
 }
 
 pub fn (mut r Redis) ltrim(key string, start int, stop int) !bool {
-	return r.send('LTRIM', key, start, stop)!.starts_with(ok_flag)
+	return r.send('LTRIM', key, start, stop)!.ok()
 }
 
 pub fn (mut r Redis) rpoplpush(source string, destination string) !string {
-	return r.send('RPOPLPUSH', source, destination)!
+	return r.send('RPOPLPUSH', source, destination)!.bytestr()
 }
 
 pub fn (mut r Redis) rpushx(key string, value string, values ...string) !int {
@@ -67,7 +67,7 @@ pub fn (mut r Redis) linsert(key string, pos string, pivot string, value string)
 }
 
 pub fn (mut r Redis) lrange(key string, start int, stop int) ![]string {
-	return r.send('LRANGE', key, start, stop)!.split('\r\n')
+	return r.send('LRANGE', key, start, stop)!.strings()
 }
 
 fn (mut r Redis) bpop(command string, key string, timeout int, keys ...string) !BPopReply {
@@ -78,11 +78,11 @@ fn (mut r Redis) bpop(command string, key string, timeout int, keys ...string) !
 	}
 	args << timeout
 
-	ret := r.send('BLPOP', ...args)!
+	ret := r.send('BLPOP', ...args)!.data().bytestr()
 	if ret == '(nil)' {
 		return error('block has timeout!')
 	}
-	lk, value := ret.split_once('\r\n') or { return error('parse reply content failed') }
+	lk, value := ret.split_once(crlf) or { return error('parse reply content failed') }
 	return BPopReply{
 		key: lk
 		value: value

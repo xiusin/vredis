@@ -18,5 +18,5 @@ pub fn (mut r Redis) pfmerge(destkey string, sourcekey string, sourcekeys ...str
 		args << it
 	}
 
-	return r.send('PFMERGE', ...args)!.starts_with(ok_flag)
+	return r.send('PFMERGE', ...args)!.ok()
 }

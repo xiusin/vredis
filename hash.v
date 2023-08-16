@@ -10,15 +10,15 @@ fn (mut r Redis) hdel(key string, field string, fields ...string) !bool {
 }
 
 fn (mut r Redis) hexists(key string, field string) !bool {
-	return r.send('HEXISTS', key, field)!.int() == 1
+	return r.send('HEXISTS', key, field)!.@is(1)
 }
 
 fn (mut r Redis) hget(key string, field string) !string {
-	return r.send('HGET', key, field)!
+	return r.send('HGET', key, field)!.bytestr()
 }
 
 fn (mut r Redis) hgetall(key string) !map[string]string {
-	res := r.send('HGETALL', key)!.split('\r\n')
+	res := r.send('HGETALL', key)!.strings()
 	mut data := map[string]string{}
 	for i := 0; i < res.len; i += 2 {
 		data[res[i]] = res[i + 1]
@@ -35,7 +35,7 @@ fn (mut r Redis) hincrbyfloat(key string, field string, incr_num f64) !f64 {
 }
 
 fn (mut r Redis) hsetnx(key string, field string, value string) !bool {
-	return r.send('HSETNX', key, field, value)!.int() == 1
+	return r.send('HSETNX', key, field, value)!.@is(1)
 }
 
 fn (mut r Redis) hset(key string, field string, value string) !bool {
@@ -44,7 +44,7 @@ fn (mut r Redis) hset(key string, field string, value string) !bool {
 }
 
 fn (mut r Redis) hkeys(key string) ![]string {
-	return r.send('HKEYS', key)!.split('\r\n')
+	return r.send('HKEYS', key)!.strings()
 }
 
 fn (mut r Redis) hlen(key string) !int {
@@ -52,7 +52,7 @@ fn (mut r Redis) hlen(key string) !int {
 }
 
 fn (mut r Redis) hvals(key string) ![]string {
-	return r.send('HVALS', key)!.split('\r\n')
+	return r.send('HVALS', key)!.strings()
 }
 
 fn (mut r Redis) hmget(key string, field string, fields ...string) ![]string {
@@ -61,7 +61,7 @@ fn (mut r Redis) hmget(key string, field string, fields ...string) ![]string {
 		args << it
 	}
 
-	return r.send('HMGET', ...args)!.split('\r\n')
+	return r.send('HMGET', ...args)!.strings()
 }
 
 fn (mut r Redis) hmset(key string, field string, value string, fvs ...string) !bool {
@@ -72,7 +72,7 @@ fn (mut r Redis) hmset(key string, field string, value string, fvs ...string) !b
 	for it in fvs {
 		args << it
 	}
-	return r.send('HMSET', ...args)!.starts_with(ok_flag)
+	return r.send('HMSET', ...args)!.ok()
 }
 
 // TODO 实现hscan

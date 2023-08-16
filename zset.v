@@ -106,7 +106,7 @@ pub fn (mut r Redis) zrange(key string, start int, stop int, withsources ...bool
 		args << 'WITHSCORES'
 	}
 
-	return r.send('ZRANGE', ...args)!.split('\r\n')
+	return r.send('ZRANGE', ...args)!.strings()
 }
 
 pub fn (mut r Redis) zrangebyscore(key string, start string, stop string, opt ZrangeOpt) ![]string {
@@ -123,7 +123,7 @@ pub fn (mut r Redis) zrangebyscore(key string, start string, stop string, opt Zr
 		args << opt.count
 	}
 
-	return r.send('ZRANGEBYSCORE', ...args)!.split('\r\n')
+	return r.send('ZRANGEBYSCORE', ...args)!.strings()
 }
 
 pub fn (mut r Redis) zrangebylex(key string, start string, stop string, opt ZrangeOpt) ![]string {
@@ -135,7 +135,7 @@ pub fn (mut r Redis) zrangebylex(key string, start string, stop string, opt Zran
 		args << opt.offset
 		args << opt.count
 	}
-	return r.send('ZRANGEBYLEX', ...args)!.split('\r\n')
+	return r.send('ZRANGEBYLEX', ...args)!.strings()
 }
 
 pub fn (mut r Redis) zrevrange(key string, start int, stop int, withsources ...bool) ![]string {
@@ -145,11 +145,11 @@ pub fn (mut r Redis) zrevrange(key string, start int, stop int, withsources ...b
 	if withsources.len > 0 && withsources[0] {
 		args << 'WITHSCORES'
 	}
-	return r.send('ZREVRANGE', ...args)!.split('\r\n')
+	return r.send('ZREVRANGE', ...args)!.strings()
 }
 
 pub fn (mut r Redis) zrevbyscore(key string, min int, max int) ![]string {
-	return r.send('ZREVBYSCORE', key, min, max)!.split('\r\n')
+	return r.send('ZREVBYSCORE', key, min, max)!.strings()
 }
 
 pub fn (mut r Redis) zrevrank(key string, member string) !int {
@@ -169,11 +169,11 @@ pub fn (mut r Redis) zscan(key string, opts ScanOpts) !ScanReply {
 		args << opts.count
 	}
 
-	next_cursor, members := r.send('ZSCAN', ...args)!.split_once('\r\n') or {
+	next_cursor, members := r.send('ZSCAN', ...args)!.data().bytestr().split_once(crlf) or {
 		return error('parse reply content failed')
 	}
 	return ScanReply{
 		cursor: next_cursor.u64()
-		result: members.split('\r\n')
+		result: members.split(crlf)
 	}
 }

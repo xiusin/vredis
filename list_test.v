@@ -1,6 +1,6 @@
 module vredis
 
-fn test_list()! {
+fn test_list() ! {
 	mut redis := new_client()!
 	defer {
 		redis.close() or {}
@@ -23,7 +23,7 @@ fn test_list()! {
 	assert redis.lpush('list1', 'l1', 'l2')! == 2
 	assert redis.lpush('list2', 'l3', 'l4')! == 2
 	assert redis.rpoplpush('list1', 'list2')! == 'l1'
-	assert redis.lrange('list', 0, -1)!.str() == "['v3_before_value']"
+	assert redis.lrange('list', 0, -1)!.bytestr() == "['v3_before_value']"
 	assert redis.rpushx('list', 'rpushx')! == 2
 	assert redis.blpop('list', 2)!.value == 'v3_before_value'
 	assert redis.brpop('list', 2)!.value == 'rpushx'

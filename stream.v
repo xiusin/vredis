@@ -6,7 +6,7 @@ pub fn (mut r Redis) xadd(key string, id string, field string, value string, fie
 		args << it
 	}
 
-	return r.send('XADD', ...args)!
+	return r.send('XADD', ...args)!.bytestr()
 }
 
 pub fn (mut r Redis) xdel(key string, id string, ids ...string) !int {
@@ -22,11 +22,11 @@ pub fn (mut r Redis) xlen(key string) !int {
 	return r.send('XLEN', key)!.int()
 }
 
-pub fn (mut r Redis) xtrim(key string,count int, same ...bool) !int {
+pub fn (mut r Redis) xtrim(key string, count int, same ...bool) !int {
 	mut args := [CmdArg(key), CmdArg('MAXLEN')]
 
 	if same.len > 0 && same[0] {
-		args << "~"
+		args << '~'
 	}
 	args << count
 	return r.send('XTRIM', ...args)!.int()
