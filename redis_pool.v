@@ -144,5 +144,14 @@ fn (mut p Pool) put(mut client ActiveRedisConn) {
 
 fn (mut p Pool) close() {
 	p.close = true
-	p.connections.close()
+	for {
+		select {
+			mut client := <-p.connections {
+				client.close() or {}
+			}
+			else {
+				p.connections.close()
+			}
+		}
+	}
 }

@@ -1,18 +1,36 @@
 module vredis
 
-fn test_pubsub() ! {
-	mut redis := new_client(name: 'rediv_pubsub')!
+fn test_pub_sub() ! {
+	mut pool := new_pool(
+		dial: fn () !&Redis {
+			return new_client()!
+		}
+	)!
 	defer {
-		redis.close() or {}
+		pool.close()
 	}
 
-	redis.flushall()!
-
-	redis.subscribe(["chan1", "chan2"], fn (message string) {
-		println(message)
-		if message.contains('exit') {
-			exit(0)
+	go fn [mut pool] () ! {
+		mut client := pool.get()!
+		defer {
+			client.release()
 		}
-	})!
 
+		client.psubscribe(['chan*'], fn (pattern string, channel string, message string) ! {
+			println('pattern: ${pattern} 	chan: ${channel} -> message: ${message}')
+
+			if message.contains('message 9') {
+				exit(0)
+			}
+		})!
+	}()
+
+	mut client := pool.get()!
+	defer {
+		client.release()
+	}
+
+	for i := 0; i < 10; i++ {
+		client.publish('chan${i % 2}', 'message ${i}')!
+	}
 }
