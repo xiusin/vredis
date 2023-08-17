@@ -55,6 +55,21 @@ redis.zadd('sets', 1, 'v1', '2', 'v2')!
 redis.flushall()!
 ```
 
+# Redis Pub/Sub Subscribe to Multiple Channels Example
+
+This example demonstrates how to use the redis.psubscribe function in Redis to subscribe to multiple channels and receive messages that match specified patterns.
+```v
+redis.psubscribe(['chan*', 'order*', 'sms*'], fn (pattern string, chan string, message string) ! {
+    println('pattern: ${pattern} 	chan: ${chan} -> message: ${message}')
+})!
+
+// You must use a new instance because the above instance is blocked.
+redis1.publish('chan1', 'to chan1')!
+redis1.publish('order1', 'to chan1')!
+redis1.publish('sms1', 'to chan1')!
+```
+
+
 Finally, when you are finished with the connection, use the close() method to close it:
 
 ```vlang
