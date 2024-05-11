@@ -11,6 +11,6 @@ mut:
 }
 
 pub fn (mut c ActiveRedisConn) release() {
-	c.put_in_time = time.now().unix
+	c.put_in_time = time.now().unix()
 	c.pool.put(mut c)
 }

@@ -1,6 +1,6 @@
 module vredis
 
-[params]
+@[params]
 pub struct ScanOpts {
 	pattern string
 	count   i64

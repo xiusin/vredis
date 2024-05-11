@@ -4,13 +4,15 @@ import net
 import time
 import sync
 
-[params]
+@[params]
 pub struct ConnOpts {
+pub:
 	read_timeout  time.Duration = time.second * 10
 	write_timeout time.Duration = time.second * 10
 	name          string
-	port          int    = 6379
-	host          string = '127.0.0.1'
+	port          int    	= 6379
+	db			  u32	 	= 1
+	host          string 	= '127.0.0.1'
 	username      string
 	requirepass   string
 }
@@ -61,12 +63,14 @@ pub fn (mut r Redis) send(cmd string, params ...CmdArg) !&Reply {
 
 pub fn (mut r Redis) write_string_to_socket(cmd string) ! {
 	r.prev_cmd = cmd
-	println('-> ${cmd}')
+	if r.debug {
+		println('-> ${cmd}')
+	}
 	r.socket.write_string(cmd)!
 }
 
-pub fn new_client(opts ConnOpts) !&Redis {
-	mut client := &Redis{
+pub fn new_client(opts ConnOpts) !Redis {
+	mut client := Redis{
 		socket: net.dial_tcp('${opts.host}:${opts.port}')!
 	}
 
@@ -92,6 +96,10 @@ pub fn new_client(opts ConnOpts) !&Redis {
 		}
 	}
 
+	if !client.@select(opts.db) or { false } {
+		return error('client select db failed')
+	}
+
 	return client
 }
 
@@ -105,102 +113,102 @@ pub fn (mut r Redis) close() ! {
 	r.socket.close()!
 }
 
-[inline]
+@[inline]
 pub fn (mut r Redis) ping() !bool {
 	return r.send('PING')!.@is('PONG')
 }
 
-[inline]
+@[inline]
 pub fn (mut r Redis) @type(key string) !string {
 	return r.send('TYPE', key)!.bytestr()
 }
 
-[inline]
+@[inline]
 pub fn (mut r Redis) expire(key string, seconds int) !bool {
 	return r.send('EXPIRE', key, seconds)!.@is(1)
 }
 
-[inline]
+@[inline]
 pub fn (mut r Redis) pexpire(key string, millis int) !bool {
 	return r.send('PEXPIRE', key, millis)!.@is(1)
 }
 
-[inline]
+@[inline]
 pub fn (mut r Redis) expireat(key string, timestamp int) !bool {
 	return r.send('EXPIREAT', key, timestamp)!.@is(1)
 }
 
-[inline]
+@[inline]
 pub fn (mut r Redis) pexpireat(key string, millistimestamp int) !bool {
 	return r.send('PEXPIREAT', key, millistimestamp)!.@is(1)
 }
 
-[inline]
+@[inline]
 pub fn (mut r Redis) persist(key string) !int {
 	return r.send('PERSIST', key)!.int()
 }
 
-[inline]
+@[inline]
 pub fn (mut r Redis) randomkey() !string {
 	return r.send('RANDOMKEY')!.bytestr()
 }
 
-[inline]
+@[inline]
 pub fn (mut r Redis) ttl(key string) !int {
 	return r.send('TTL', key)!.int()
 }
 
-[inline]
+@[inline]
 pub fn (mut r Redis) pttl(key string) !int {
 	return r.send('PTTL', key)!.int()
 }
 
-[inline]
+@[inline]
 pub fn (mut r Redis) exists(key string) !bool {
 	return r.send('EXISTS', key)!.@is(1)
 }
 
-[inline]
+@[inline]
 pub fn (mut r Redis) del(key string) !bool {
 	return r.send('DEL', key)!.@is(1)
 }
 
-[inline]
+@[inline]
 pub fn (mut r Redis) unlink(key string) !bool {
 	return r.send('UNLINK', key)!.@is(1)
 }
 
-[inline]
+@[inline]
 pub fn (mut r Redis) rename(key string, newkey string) !bool {
 	return r.send('RENAME', key, newkey)!.ok()
 }
 
-[inline]
+@[inline]
 pub fn (mut r Redis) renamenx(key string, newkey string) !bool {
 	return r.send('RENAMENX', key, newkey)!.@is(1)
 }
 
-[inline]
+@[inline]
 pub fn (mut r Redis) flushall() !bool {
 	return r.send('FLUSHALL')!.ok()
 }
 
-[inline]
+@[inline]
 pub fn (mut r Redis) flushdb() !bool {
 	return r.send('FLUSHDB')!.ok()
 }
 
-[inline]
+@[inline]
 pub fn (mut r Redis) @select(db u32) !bool {
 	return r.send('SELECT', int(db))!.ok()
 }
 
-[inline]
+@[inline]
 pub fn (mut r Redis) dbsize() !int {
 	return r.send('DBSIZE')!.int()
 }
 
-[inline]
+@[inline]
 pub fn (mut r Redis) move(key string, db u32) !bool {
 	return r.send('MOVE', key, int(db))!.ok()
 }

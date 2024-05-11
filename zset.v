@@ -2,7 +2,7 @@ module vredis
 
 import strconv
 
-[params]
+@[params]
 pub struct ZrangeOpt {
 	withscores bool
 	offset     int

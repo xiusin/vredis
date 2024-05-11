@@ -12,7 +12,7 @@ const err_conn_no_active = error('vredis: client no active')
 type DialFn = fn () !&Redis
 
 // PoolOpt Struct representing the options for a connection pool.
-[params]
+@[params]
 pub struct PoolOpt {
 	dial               DialFn = unsafe { nil } // Function used to establish a connection.
 	max_active         int    = 10 // Maximum number of active connections allowed in the pool.
@@ -73,12 +73,12 @@ fn (mut p Pool) get() !&ActiveRedisConn {
 	for {
 		select {
 			mut client := <-p.connections {
-				if time.now().unix - client.active_time >= p.opt.max_conn_life_time {
+				if time.now().unix() - client.active_time >= p.opt.max_conn_life_time {
 					client.close() or {}
 					continue
 				}
 
-				if time.now().unix - client.put_in_time >= p.opt.idle_timeout {
+				if time.now().unix() - client.put_in_time >= p.opt.idle_timeout {
 					client.close() or {}
 					continue
 				}
@@ -98,7 +98,7 @@ fn (mut p Pool) get() !&ActiveRedisConn {
 				mut client := p.opt.dial()!
 				p.active++
 				return &ActiveRedisConn{
-					active_time: time.now().unix
+					active_time: time.now().unix()
 					pool: &p
 					Redis: client
 				}

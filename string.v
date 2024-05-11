@@ -1,51 +1,51 @@
 module vredis
 
-[inline]
+@[inline]
 pub fn (mut r Redis) incrby(key string, increment int) !int {
 	return r.send('INCRBY', key, increment)!.int()
 }
 
-[inline]
+@[inline]
 pub fn (mut r Redis) incr(key string) !int {
 	return r.incrby(key, 1)!
 }
 
-[inline]
+@[inline]
 pub fn (mut r Redis) decr(key string) !int {
 	return r.incrby(key, -1)!
 }
 
-[inline]
+@[inline]
 pub fn (mut r Redis) decrby(key string, decrement int) !int {
 	return r.incrby(key, -decrement)!
 }
 
-[inline]
+@[inline]
 pub fn (mut r Redis) incrbyfloat(key string, increment f64) !f64 {
 	return r.send('INCRBYFLOAT', key, increment)!.f64()
 }
 
-[inline]
+@[inline]
 pub fn (mut r Redis) append(key string, value string) !int {
 	return r.send('APPEND', key, value)!.int()
 }
 
-[inline]
+@[inline]
 pub fn (mut r Redis) strlen(key string) !int {
 	return r.send('STRLEN', key)!.int()
 }
 
-[inline]
+@[inline]
 pub fn (mut r Redis) get(key string) !string {
 	return r.send('GET', key)!.bytestr()
 }
 
-[inline]
+@[inline]
 pub fn (mut r Redis) getset(key string, value string) !string {
 	return r.send('GETSET', key, value)!.bytestr()
 }
 
-[inline]
+@[inline]
 pub fn (mut r Redis) getrange(key string, start int, end int) !string {
 	return r.send('GETRANGE', key, start, end)!.bytestr()
 }
@@ -118,7 +118,7 @@ pub fn (mut r Redis) set_opts(key string, value string, opts SetOpts) !bool {
 	return r.send('SET', ...args)!.ok()
 }
 
-[inline]
+@[inline]
 pub fn (mut r Redis) keys(pattern string) ![]string {
 	return r.send('KEYS', pattern)!.strings()
 }
