@@ -25,7 +25,7 @@ fn test_set() ! {
 	assert redis.zrangebyscore('sets', '-inf', '+inf', withscores: true)!.bytestr() == "['v1', '1', 'v2', '2']"
 	assert redis.zrangebyscore('sets', '-inf', '+inf', withscores: true, count: 1)!.bytestr() == "['v1', '1']"
 	assert redis.zrangebyscore('sets', '-inf', '+inf', withscores: true, offset: 1, count: 1)!.bytestr() == "['v2', '2']"
-	assert redis.zrangebylex('sets', '-', '+', count: 1)!.bytestr() == "['v1']"
+	assert redis.zrangebylex('sets', '-', '+', count: 1)![0] == 'v1'
 	assert redis.zrem('sets', 'v1')! == 1
 	assert redis.zcard('sets')! == 1
 	assert redis.zincrby('sets', 10, 'v2')! == 12

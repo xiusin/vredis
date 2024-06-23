@@ -20,8 +20,8 @@ fn test_pool() ! {
 	pool.get() or { assert err == err_pool_exhausted }
 
 	client.release()
-	assert client == pool.get()!
 
+	assert client == pool.get()!
 	assert client != client1
 
 	client1.release()
