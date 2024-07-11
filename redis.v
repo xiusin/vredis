@@ -10,9 +10,9 @@ pub:
 	read_timeout  time.Duration = time.second * 10
 	write_timeout time.Duration = time.second * 10
 	name          string
-	port          int    	= 6379
-	db			  u32	 	= 1
-	host          string 	= '127.0.0.1'
+	port          int = 6379
+	db            u32
+	host          string = '127.0.0.1'
 	username      string
 	requirepass   string
 }
@@ -69,8 +69,8 @@ pub fn (mut r Redis) write_string_to_socket(cmd string) ! {
 	r.socket.write_string(cmd)!
 }
 
-pub fn new_client(opts ConnOpts) !Redis {
-	mut client := Redis{
+pub fn new_client(opts ConnOpts) !&Redis {
+	mut client := &Redis{
 		socket: net.dial_tcp('${opts.host}:${opts.port}')!
 	}
 
