@@ -9,6 +9,8 @@ const err_conn_closed = error('vredis: connection closed')
 
 const err_conn_no_active = error('vredis: client no active')
 
+const err_read_message = error('vredis: read message error')
+
 type DialFn = fn () !&Redis
 
 // PoolOpt Struct representing the options for a connection pool.
@@ -67,24 +69,23 @@ pub fn (mut p Pool) get() !&ActiveRedisConn {
 		return vredis.err_conn_closed
 	}
 
-	if p.active >= p.opt.max_active { // 超出最大活动链接
+	if p.active >= p.opt.max_active {
 		return vredis.err_pool_exhausted
 	}
 
 	for {
 		select {
 			mut client := <-p.connections {
-				if time.now().unix() - client.active_time >= p.opt.max_conn_life_time {
+				unix := time.now().unix()
+				if unix - client.active_time >= p.opt.max_conn_life_time {
 					client.close() or {}
 					continue
 				}
 
-				if time.now().unix() - client.put_in_time >= p.opt.idle_timeout {
+				if unix - client.put_in_time >= p.opt.idle_timeout {
 					client.close() or {}
 					continue
 				}
-
-				client.is_active = true
 
 				if !isnil(p.opt.test_on_borrow) {
 					p.opt.test_on_borrow(client) or {
@@ -93,6 +94,7 @@ pub fn (mut p Pool) get() !&ActiveRedisConn {
 					}
 				}
 
+				client.is_active = true
 				return client
 			}
 			else {

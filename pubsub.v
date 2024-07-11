@@ -5,7 +5,7 @@ fn (mut r Redis) subscribe(channels []string, cb fn (string, string) !) ! {
 		content := it.bytestr()
 		if content.starts_with('message') {
 			ch, message := content.replace('message${crlf}', '').split_once(crlf) or {
-				return error('read error')
+				return err_read_message
 			}
 			cb(ch, message)!
 		}
@@ -17,9 +17,9 @@ fn (mut r Redis) psubscribe(channels []string, cb fn (string, string, string) !)
 		content := it.bytestr()
 		if content.starts_with('pmessage') {
 			pattern, reply := content.replace('pmessage${crlf}', '').split_once(crlf) or {
-				return error('read error')
+				return err_read_message
 			}
-			ch, message := reply.split_once(crlf) or { return error('read error') }
+			ch, message := reply.split_once(crlf) or { return err_read_message }
 			cb(pattern, ch, message)!
 		}
 	})!
