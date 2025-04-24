@@ -6,7 +6,7 @@ pub:
 	value string
 }
 
-fn (mut r Redis) push(cmd string, key string, value string, values []string) !int {
+pub fn (mut r Redis) push(cmd string, key string, value string, values []string) !int {
 	mut args := [CmdArg(key), CmdArg(value)]
 	for val in values {
 		args << val
@@ -70,7 +70,7 @@ pub fn (mut r Redis) lrange(key string, start int, stop int) ![]string {
 	return r.send('LRANGE', key, start, stop)!.strings()
 }
 
-fn (mut r Redis) bpop(command string, key string, timeout int, keys ...string) !BPopReply {
+pub fn (mut r Redis) bpop(command string, key string, timeout int, keys ...string) !BPopReply {
 	mut args := [CmdArg(key)]
 	args << keys
 	for it in keys {

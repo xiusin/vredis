@@ -1,6 +1,6 @@
 module vredis
 
-fn (mut r Redis) subscribe(channels []string, cb fn (string, string) !) ! {
+pub fn (mut r Redis) subscribe(channels []string, cb fn (string, string) !) ! {
 	r.subscribe_('SUBSCRIBE', channels, fn [cb] (it []u8) ! {
 		content := it.bytestr()
 		if content.starts_with('message') {
@@ -12,7 +12,7 @@ fn (mut r Redis) subscribe(channels []string, cb fn (string, string) !) ! {
 	})!
 }
 
-fn (mut r Redis) psubscribe(channels []string, cb fn (string, string, string) !) ! {
+pub fn (mut r Redis) psubscribe(channels []string, cb fn (string, string, string) !) ! {
 	r.subscribe_('PSUBSCRIBE', channels, fn [cb] (it []u8) ! {
 		content := it.bytestr()
 		if content.starts_with('pmessage') {
@@ -25,7 +25,7 @@ fn (mut r Redis) psubscribe(channels []string, cb fn (string, string, string) !)
 	})!
 }
 
-fn (mut r Redis) subscribe_(cmd string, channels []string, cb fn ([]u8) !) ! {
+pub fn (mut r Redis) subscribe_(cmd string, channels []string, cb fn ([]u8) !) ! {
 	mut args := []CmdArg{}
 	for ch in channels {
 		args << ch
