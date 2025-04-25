@@ -95,6 +95,7 @@ pub fn (mut p Pool) get() !&ActiveRedisConn {
 				}
 
 				client.is_active = true
+				p.active++
 				return client
 			}
 			else {
