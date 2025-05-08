@@ -5,6 +5,8 @@ import time
 
 const err_pool_exhausted = error('vredis: connection pool exhausted')
 
+const err_pool_get_failed = error('vredis: connection pool get redis instance failed')
+
 const err_conn_closed = error('vredis: connection closed')
 
 const err_conn_no_active = error('vredis: client no active')
@@ -21,7 +23,7 @@ pub:
 	max_active         int    = 10 // Maximum number of active connections allowed in the pool.
 	idle_timeout       i64    = 600 // Maximum time in seconds that an idle connection can stay in the pool.
 	max_conn_life_time i64    = 600 // Maximum time in seconds that a connection can stay alive.
-	test_on_borrow     fn (&ActiveRedisConn) ! = unsafe { nil } // Function used to test a connection before borrowing it from the pool.
+	test_on_borrow     fn (mut ActiveRedisConn) ! = unsafe { nil } // Function used to test a connection before borrowing it from the pool.
 }
 
 pub struct Pool {
@@ -72,7 +74,6 @@ pub fn (mut p Pool) get() !&ActiveRedisConn {
 	if p.active >= p.opt.max_active {
 		return vredis.err_pool_exhausted
 	}
-
 	for {
 		select {
 			mut client := <-p.connections {
@@ -88,7 +89,7 @@ pub fn (mut p Pool) get() !&ActiveRedisConn {
 				}
 
 				if !isnil(p.opt.test_on_borrow) {
-					p.opt.test_on_borrow(client) or {
+					p.opt.test_on_borrow(mut client) or {
 						client.close() or {}
 						continue
 					}
@@ -100,6 +101,7 @@ pub fn (mut p Pool) get() !&ActiveRedisConn {
 			}
 			else {
 				mut client := p.opt.dial()!
+				client.is_active = true
 				p.active++
 				return &ActiveRedisConn{
 					active_time: time.now().unix()
@@ -110,7 +112,7 @@ pub fn (mut p Pool) get() !&ActiveRedisConn {
 		}
 	}
 
-	return vredis.err_pool_exhausted
+	return vredis.err_pool_get_failed
 }
 
 pub fn (mut p Pool) active_cnt() u32 {
