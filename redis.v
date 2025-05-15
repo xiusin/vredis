@@ -4,6 +4,8 @@ import net
 import time
 import sync
 
+const err_nil = error('redis get nil')
+
 @[params]
 pub struct ConnOpts {
 pub:
@@ -35,6 +37,10 @@ pub struct SetOpts {
 	keep_ttl bool
 }
 
+pub fn (mut r Redis) set_debug(debug bool) {
+	r.debug = debug
+}
+
 fn (mut r Redis) str() string {
 	return '&vredis.Redis{
 	prev_cmd: ${r.prev_cmd}
@@ -56,9 +62,15 @@ pub fn (mut r Redis) send(cmd string, params ...CmdArg) !&Reply {
 	args.add(...params)
 	r.write_string_to_socket(args.build())!
 
-	return &Reply{
+	reply := &Reply{
 		data: r.protocol.read_reply()!
 	}
+
+	if reply.data.bytestr() == nil_flag {
+		return err_nil
+	}
+
+	return reply
 }
 
 pub fn (mut r Redis) write_string_to_socket(cmd string) ! {

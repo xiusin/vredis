@@ -94,27 +94,24 @@ pub fn (mut r Redis) mget(key string, keys ...string) !map[string]string {
 }
 
 pub fn (mut r Redis) set_opts(key string, value string, opts SetOpts) !bool {
-	ex := if opts.ex == -4 && opts.px == -4 {
-		''
-	} else if opts.ex != -4 {
-		' EX ${opts.ex}'
-	} else {
-		' PX ${opts.px}'
-	}
-	nx := if opts.nx == false && opts.xx == false {
-		''
-	} else if opts.nx == true {
-		' NX'
-	} else {
-		' XX'
-	}
-	keep_ttl := if opts.keep_ttl == false { '' } else { ' KEEPTTL' }
-
 	mut args := [CmdArg(value)]
-	args << ex
-	args << nx
-	args << keep_ttl
-
+	if opts.ex == -4 && opts.px == -4 {
+	} else if opts.ex != -4 {
+		args << 'EX'
+		args << '${opts.ex}'
+	} else {
+		args << 'PX'
+		args << '${opts.px}'
+	}
+	 if opts.nx == false && opts.xx == false {
+	} else if opts.nx == true {
+		args << 'NX'
+	} else {
+		args << 'XX'
+	}
+	if opts.keep_ttl  {
+		args << 'KEEPTTL'
+	}
 	return r.send('SET', ...args)!.ok()
 }
 

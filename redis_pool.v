@@ -31,7 +31,6 @@ mut:
 	close       bool
 	connections chan &ActiveRedisConn
 	mu          sync.Mutex
-	active      u32
 }
 
 pub fn new_pool(opt PoolOpt) !&Pool {
@@ -52,7 +51,6 @@ pub fn (mut p Pool) str() string {
 	}
 
 	return '&vredis.Pool{
-	active: ${p.active}
 	len: ${p.connections.len}
 	close: ${p.close}
 	opt: ${p.opt}
@@ -67,10 +65,6 @@ pub fn (mut p Pool) get() !&ActiveRedisConn {
 
 	if p.close {
 		return vredis.err_conn_closed
-	}
-
-	if p.active >= p.opt.max_active {
-		return vredis.err_pool_exhausted
 	}
 
 	for {
@@ -95,12 +89,10 @@ pub fn (mut p Pool) get() !&ActiveRedisConn {
 				}
 
 				client.is_active = true
-				p.active++
 				return client
 			}
 			else {
 				mut client := p.opt.dial()!
-				p.active++
 				return &ActiveRedisConn{
 					active_time: time.now().unix()
 					pool: &p
@@ -113,19 +105,9 @@ pub fn (mut p Pool) get() !&ActiveRedisConn {
 	return vredis.err_pool_exhausted
 }
 
-pub fn (mut p Pool) active_cnt() u32 {
-	p.mu.@lock()
-	defer {
-		p.mu.unlock()
-	}
-
-	return p.active
-}
-
 pub fn (mut p Pool) put(mut client ActiveRedisConn) {
 	p.mu.@lock()
 	defer {
-		p.active--
 		p.mu.unlock()
 	}
 
