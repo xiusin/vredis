@@ -5,6 +5,8 @@ import time
 
 const err_pool_exhausted = error('vredis: connection pool exhausted')
 
+const err_pool_get_failed = error('vredis: connection pool get redis instance failed')
+
 const err_conn_closed = error('vredis: connection closed')
 
 const err_conn_no_active = error('vredis: client no active')
@@ -17,11 +19,11 @@ type DialFn = fn () !&Redis
 @[params]
 pub struct PoolOpt {
 pub:
-	dial               DialFn = unsafe { nil } // Function used to establish a connection.
-	max_active         int    = 10 // Maximum number of active connections allowed in the pool.
-	idle_timeout       i64    = 600 // Maximum time in seconds that an idle connection can stay in the pool.
-	max_conn_life_time i64    = 600 // Maximum time in seconds that a connection can stay alive.
-	test_on_borrow     fn (&ActiveRedisConn) ! = unsafe { nil } // Function used to test a connection before borrowing it from the pool.
+	dial               DialFn                     = unsafe { nil } // Function used to establish a connection.
+	max_active         int                        = 10             // Maximum number of active connections allowed in the pool.
+	idle_timeout       i64                        = 600            // Maximum time in seconds that an idle connection can stay in the pool.
+	max_conn_life_time i64                        = 600            // Maximum time in seconds that a connection can stay alive.
+	test_on_borrow     fn (mut ActiveRedisConn) ! = unsafe { nil } // Function used to test a connection before borrowing it from the pool.
 }
 
 pub struct Pool {
@@ -39,7 +41,7 @@ pub fn new_pool(opt PoolOpt) !&Pool {
 	}
 
 	return &Pool{
-		opt: opt
+		opt:         opt
 		connections: chan &ActiveRedisConn{cap: opt.max_active}
 	}
 }
@@ -64,7 +66,7 @@ pub fn (mut p Pool) get() !&ActiveRedisConn {
 	}
 
 	if p.close {
-		return vredis.err_conn_closed
+		return err_conn_closed
 	}
 
 	for {
@@ -82,7 +84,7 @@ pub fn (mut p Pool) get() !&ActiveRedisConn {
 				}
 
 				if !isnil(p.opt.test_on_borrow) {
-					p.opt.test_on_borrow(client) or {
+					p.opt.test_on_borrow(mut client) or {
 						client.close() or {}
 						continue
 					}
@@ -95,14 +97,14 @@ pub fn (mut p Pool) get() !&ActiveRedisConn {
 				mut client := p.opt.dial()!
 				return &ActiveRedisConn{
 					active_time: time.now().unix()
-					pool: &p
-					Redis: client
+					pool:        &p
+					Redis:       client
 				}
 			}
 		}
 	}
 
-	return vredis.err_pool_exhausted
+	return err_pool_get_failed
 }
 
 pub fn (mut p Pool) put(mut client ActiveRedisConn) {

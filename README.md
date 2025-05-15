@@ -2,6 +2,9 @@
 
 VRedis is a Redis client service written in the V programming language. It allows you to connect to a Redis database over the network, send commands, and receive responses. Please note that this project is currently under **development** and is not recommended for use in production projects.
 
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/xiusin/vredis)
+
+
 > Almost support all Redis commands.
 
 # Installation
