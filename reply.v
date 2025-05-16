@@ -7,6 +7,8 @@ mut:
 
 const ok_flag = 'OK'
 
+const nil_flag = '(nil)'
+
 const crlf = '\r\n'
 
 @[inline]

@@ -19,10 +19,10 @@ type DialFn = fn () !&Redis
 @[params]
 pub struct PoolOpt {
 pub:
-	dial               DialFn = unsafe { nil } // Function used to establish a connection.
-	max_active         int    = 10 // Maximum number of active connections allowed in the pool.
-	idle_timeout       i64    = 600 // Maximum time in seconds that an idle connection can stay in the pool.
-	max_conn_life_time i64    = 600 // Maximum time in seconds that a connection can stay alive.
+	dial               DialFn                     = unsafe { nil } // Function used to establish a connection.
+	max_active         int                        = 10             // Maximum number of active connections allowed in the pool.
+	idle_timeout       i64                        = 600            // Maximum time in seconds that an idle connection can stay in the pool.
+	max_conn_life_time i64                        = 600            // Maximum time in seconds that a connection can stay alive.
 	test_on_borrow     fn (mut ActiveRedisConn) ! = unsafe { nil } // Function used to test a connection before borrowing it from the pool.
 }
 
@@ -33,7 +33,6 @@ mut:
 	close       bool
 	connections chan &ActiveRedisConn
 	mu          sync.Mutex
-	active      u32
 }
 
 pub fn new_pool(opt PoolOpt) !&Pool {
@@ -42,7 +41,7 @@ pub fn new_pool(opt PoolOpt) !&Pool {
 	}
 
 	return &Pool{
-		opt: opt
+		opt:         opt
 		connections: chan &ActiveRedisConn{cap: opt.max_active}
 	}
 }
@@ -54,7 +53,6 @@ pub fn (mut p Pool) str() string {
 	}
 
 	return '&vredis.Pool{
-	active: ${p.active}
 	len: ${p.connections.len}
 	close: ${p.close}
 	opt: ${p.opt}
@@ -68,12 +66,9 @@ pub fn (mut p Pool) get() !&ActiveRedisConn {
 	}
 
 	if p.close {
-		return vredis.err_conn_closed
+		return err_conn_closed
 	}
 
-	if p.active >= p.opt.max_active {
-		return vredis.err_pool_exhausted
-	}
 	for {
 		select {
 			mut client := <-p.connections {
@@ -96,38 +91,25 @@ pub fn (mut p Pool) get() !&ActiveRedisConn {
 				}
 
 				client.is_active = true
-				p.active++
 				return client
 			}
 			else {
 				mut client := p.opt.dial()!
-				client.is_active = true
-				p.active++
 				return &ActiveRedisConn{
 					active_time: time.now().unix()
-					pool: &p
-					Redis: client
+					pool:        &p
+					Redis:       client
 				}
 			}
 		}
 	}
 
-	return vredis.err_pool_get_failed
-}
-
-pub fn (mut p Pool) active_cnt() u32 {
-	p.mu.@lock()
-	defer {
-		p.mu.unlock()
-	}
-
-	return p.active
+	return err_pool_get_failed
 }
 
 pub fn (mut p Pool) put(mut client ActiveRedisConn) {
 	p.mu.@lock()
 	defer {
-		p.active--
 		p.mu.unlock()
 	}
 
