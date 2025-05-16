@@ -104,11 +104,6 @@ pub fn new_client(opts ConnOpts) !&Redis {
 }
 
 pub fn (mut r Redis) close() ! {
-	r.@lock()
-	defer {
-		r.unlock()
-	}
-
 	r.send('QUIT')!
 	r.socket.close()!
 }
