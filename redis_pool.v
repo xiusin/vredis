@@ -27,13 +27,12 @@ pub:
 }
 
 pub struct Pool {
-	sync.Once
 mut:
-	active      shared i64
+	active      u64
 	opt         PoolOpt
 	close       bool
 	connections chan &ActiveRedisConn
-	mu          sync.Mutex
+	mu          &sync.Mutex
 }
 
 pub fn new_pool(opt PoolOpt) !&Pool {
@@ -43,6 +42,7 @@ pub fn new_pool(opt PoolOpt) !&Pool {
 
 	return &Pool{
 		opt:         opt
+		mu:          sync.new_mutex()
 		connections: chan &ActiveRedisConn{cap: opt.max_active}
 	}
 }
@@ -57,13 +57,9 @@ pub fn (mut p Pool) get() !&ActiveRedisConn {
 		return err_conn_closed
 	}
 
-	rlock p.active {
-		unsafe {
-			act := p.active
-			if act >= p.opt.max_active {
-				return err_pool_exhausted
-			}
-		}
+	if p.active >= p.opt.max_active {
+		println('超出了最大连接数 ${p.active}')
+		return err_pool_exhausted
 	}
 
 	for {
@@ -88,19 +84,15 @@ pub fn (mut p Pool) get() !&ActiveRedisConn {
 				}
 
 				client.is_active = true
-				lock p.active {
-					unsafe { p.active++ }
-				}
+				p.active++
 				return client
 			}
 			else {
 				mut client := p.opt.dial()!
-				lock p.active {
-					unsafe { p.active++ }
-				}
+				p.active++
 				return &ActiveRedisConn{
 					active_time: time.now().unix()
-					pool:        &p
+					pool:        unsafe { &p }
 					Redis:       client
 				}
 			}
@@ -113,14 +105,6 @@ pub fn (mut p Pool) get() !&ActiveRedisConn {
 pub fn (mut p Pool) put(mut client ActiveRedisConn) {
 	p.mu.@lock()
 	defer {
-		lock p.active {
-			unsafe {
-				if p.active > 0 {
-					p.active--
-				}
-			}
-		}
-
 		p.mu.unlock()
 	}
 
@@ -130,6 +114,10 @@ pub fn (mut p Pool) put(mut client ActiveRedisConn) {
 
 	if !client.is_active {
 		return
+	}
+
+	if p.active > 0 {
+		p.active--
 	}
 	client.is_active = false
 
