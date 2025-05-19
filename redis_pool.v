@@ -126,7 +126,9 @@ pub fn (mut p Pool) put(mut client ActiveRedisConn) {
 	client.is_active = false
 
 	select {
-		p.connections <- client {}
+		p.connections <- client {
+			p.gen_instance_num--
+		}
 		else {
 			client.close() or {}
 		}
