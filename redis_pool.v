@@ -58,7 +58,6 @@ pub fn (mut p Pool) get() !&ActiveRedisConn {
 	}
 
 	if p.active >= p.opt.max_active {
-		println('超出了最大连接数 ${p.active}')
 		return err_pool_exhausted
 	}
 
