@@ -29,10 +29,11 @@ pub:
 pub struct Pool {
 	sync.Once
 mut:
-	opt         PoolOpt
-	close       bool
-	connections chan &ActiveRedisConn
-	mu          sync.Mutex
+	gen_instance_num i64
+	opt              PoolOpt
+	close            bool
+	connections      chan &ActiveRedisConn
+	mu               sync.Mutex
 }
 
 pub fn new_pool(opt PoolOpt) !&Pool {
@@ -54,6 +55,7 @@ pub fn (mut p Pool) str() string {
 
 	return '&vredis.Pool{
 	len: ${p.connections.len}
+	gen_instance_num: ${p.gen_instance_num}
 	close: ${p.close}
 	opt: ${p.opt}
 }'
