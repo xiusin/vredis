@@ -59,7 +59,8 @@ pub fn (mut p Pool) get() !&ActiveRedisConn {
 
 	rlock p.active {
 		unsafe {
-			if p.active >= p.opt.max_active {
+			act := p.active
+			if act >= p.opt.max_active {
 				return err_pool_exhausted
 			}
 		}
