@@ -22,7 +22,7 @@ pub:
 pub struct Redis {
 	sync.Mutex
 mut:
-	is_active bool = true
+	is_active bool         = true
 	socket    &net.TcpConn = unsafe { nil }
 	prev_cmd  string
 	debug     bool
@@ -117,6 +117,11 @@ pub fn new_client(opts ConnOpts) !&Redis {
 
 pub fn (mut r Redis) close() ! {
 	r.send('QUIT')!
+
+	r.@lock()
+	defer {
+		r.unlock()
+	}
 	r.socket.close()!
 }
 

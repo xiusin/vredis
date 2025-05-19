@@ -29,11 +29,11 @@ pub:
 pub struct Pool {
 	sync.Once
 mut:
-	gen_instance_num i64
-	opt              PoolOpt
-	close            bool
-	connections      chan &ActiveRedisConn
-	mu               sync.Mutex
+	active      shared i64
+	opt         PoolOpt
+	close       bool
+	connections chan &ActiveRedisConn
+	mu          sync.Mutex
 }
 
 pub fn new_pool(opt PoolOpt) !&Pool {
@@ -47,20 +47,6 @@ pub fn new_pool(opt PoolOpt) !&Pool {
 	}
 }
 
-pub fn (mut p Pool) str() string {
-	p.mu.@lock()
-	defer {
-		p.mu.unlock()
-	}
-
-	return '&vredis.Pool{
-	len: ${p.connections.len}
-	gen_instance_num: ${p.gen_instance_num}
-	close: ${p.close}
-	opt: ${p.opt}
-}'
-}
-
 pub fn (mut p Pool) get() !&ActiveRedisConn {
 	p.mu.@lock()
 	defer {
@@ -69,6 +55,12 @@ pub fn (mut p Pool) get() !&ActiveRedisConn {
 
 	if p.close {
 		return err_conn_closed
+	}
+
+	rlock p.active {
+		if p.active >= p.opt.max_active {
+			return err_pool_exhausted
+		}
 	}
 
 	for {
@@ -93,11 +85,16 @@ pub fn (mut p Pool) get() !&ActiveRedisConn {
 				}
 
 				client.is_active = true
+				lock p.active {
+					p.active++
+				}
 				return client
 			}
 			else {
 				mut client := p.opt.dial()!
-				p.gen_instance_num++
+				lock p.active {
+					p.active++
+				}
 				return &ActiveRedisConn{
 					active_time: time.now().unix()
 					pool:        &p
@@ -113,6 +110,12 @@ pub fn (mut p Pool) get() !&ActiveRedisConn {
 pub fn (mut p Pool) put(mut client ActiveRedisConn) {
 	p.mu.@lock()
 	defer {
+		lock p.active {
+			if p.active > 0 {
+				p.active--
+			}
+		}
+
 		p.mu.unlock()
 	}
 
@@ -126,9 +129,7 @@ pub fn (mut p Pool) put(mut client ActiveRedisConn) {
 	client.is_active = false
 
 	select {
-		p.connections <- client {
-			p.gen_instance_num--
-		}
+		p.connections <- client {}
 		else {
 			client.close() or {}
 		}
