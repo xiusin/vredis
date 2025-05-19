@@ -97,6 +97,7 @@ pub fn (mut p Pool) get() !&ActiveRedisConn {
 			}
 			else {
 				mut client := p.opt.dial()!
+				p.gen_instance_num++
 				return &ActiveRedisConn{
 					active_time: time.now().unix()
 					pool:        &p
