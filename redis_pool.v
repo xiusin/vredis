@@ -58,8 +58,10 @@ pub fn (mut p Pool) get() !&ActiveRedisConn {
 	}
 
 	rlock p.active {
-		if p.active >= p.opt.max_active {
-			return err_pool_exhausted
+		unsafe {
+			if p.active >= p.opt.max_active {
+				return err_pool_exhausted
+			}
 		}
 	}
 
@@ -86,14 +88,14 @@ pub fn (mut p Pool) get() !&ActiveRedisConn {
 
 				client.is_active = true
 				lock p.active {
-					p.active++
+					unsafe { p.active++ }
 				}
 				return client
 			}
 			else {
 				mut client := p.opt.dial()!
 				lock p.active {
-					p.active++
+					unsafe { p.active++ }
 				}
 				return &ActiveRedisConn{
 					active_time: time.now().unix()
@@ -111,8 +113,10 @@ pub fn (mut p Pool) put(mut client ActiveRedisConn) {
 	p.mu.@lock()
 	defer {
 		lock p.active {
-			if p.active > 0 {
-				p.active--
+			unsafe {
+				if p.active > 0 {
+					p.active--
+				}
 			}
 		}
 
