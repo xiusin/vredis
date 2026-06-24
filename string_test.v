@@ -26,7 +26,12 @@ io'
 	assert redis.ttl('website')! == -1
 	assert redis.pttl('website')! == -1
 	assert redis.get('website')! == 'www'
-	assert redis.get('xxxx')! == '(nil)'
+	// get on a missing key returns err_nil (not the "(nil)" sentinel).
+	nil_val := redis.get('xxxx') or {
+		assert err.msg() == 'redis: nil reply'
+		'nil'
+	}
+	assert nil_val == 'nil'
 	assert redis.incr('vredis_counter')! == 1
 	assert redis.incrby('vredis_counter', 2)! == 3
 	assert redis.decrby('vredis_counter', 2)! == 1
@@ -38,7 +43,12 @@ io'
 	assert redis.strlen('website')! == 12
 	assert redis.get('website')! == 'www.vlang.io'
 	assert redis.getrange('website', 0, 2)! == 'www'
-	assert redis.getset('exists', 'exists')! == '(nil)'
+	// getset on a missing key returns err_nil for the old value.
+	nil_old := redis.getset('exists', 'exists') or {
+		assert err.msg() == 'redis: nil reply'
+		'nil'
+	}
+	assert nil_old == 'nil'
 	assert redis.getset('exists', 'exists')! == 'exists'
 	assert redis.setrange('exists', 0, 'mo')! == 6
 	assert redis.get('exists')! == 'moists'

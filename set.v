@@ -35,9 +35,14 @@ pub fn (mut r Redis) sismember(key string, value string) !bool {
 	return r.send('SISMEMBER', key, value)!.int() == 1
 }
 
-@[inline]
+// spop removes and returns a random member from a set. Returns err_nil
+// when the key does not exist or the set is empty.
 pub fn (mut r Redis) spop(key string) !string {
-	return r.send('SPOP', key)!.bytestr()
+	reply := r.send('SPOP', key)!
+	if reply.kind == .nil_reply {
+		return err_nil
+	}
+	return reply.bytestr()
 }
 
 @[inline]

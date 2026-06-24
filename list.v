@@ -26,14 +26,24 @@ pub fn (mut r Redis) rpush(key string, value string, values ...string) !int {
 	return r.push('RPUSH', key, value, values)!
 }
 
-@[inline]
+// lpop removes and returns the first element of a list. Returns err_nil
+// when the key does not exist or the list is empty.
 pub fn (mut r Redis) lpop(key string) !string {
-	return r.send('LPOP', key)!.bytestr()
+	reply := r.send('LPOP', key)!
+	if reply.kind == .nil_reply {
+		return err_nil
+	}
+	return reply.bytestr()
 }
 
-@[inline]
+// rpop removes and returns the last element of a list. Returns err_nil
+// when the key does not exist or the list is empty.
 pub fn (mut r Redis) rpop(key string) !string {
-	return r.send('RPOP', key)!.bytestr()
+	reply := r.send('RPOP', key)!
+	if reply.kind == .nil_reply {
+		return err_nil
+	}
+	return reply.bytestr()
 }
 
 @[inline]
@@ -46,9 +56,14 @@ pub fn (mut r Redis) llen(key string) !int {
 	return r.send('LLEN', key)!.int()
 }
 
-@[inline]
+// lindex returns the element at `index` in a list. Returns err_nil when
+// the key does not exist or the index is out of range.
 pub fn (mut r Redis) lindex(key string, index int) !string {
-	return r.send('LINDEX', key, index)!.bytestr()
+	reply := r.send('LINDEX', key, index)!
+	if reply.kind == .nil_reply {
+		return err_nil
+	}
+	return reply.bytestr()
 }
 
 @[inline]
@@ -61,9 +76,15 @@ pub fn (mut r Redis) ltrim(key string, start int, stop int) !bool {
 	return r.send('LTRIM', key, start, stop)!.ok()
 }
 
-@[inline]
+// rpoplpush atomically pops the tail of `source` and pushes it to the
+// head of `destination`. Returns err_nil when `source` does not exist
+// or is empty.
 pub fn (mut r Redis) rpoplpush(source string, destination string) !string {
-	return r.send('RPOPLPUSH', source, destination)!.bytestr()
+	reply := r.send('RPOPLPUSH', source, destination)!
+	if reply.kind == .nil_reply {
+		return err_nil
+	}
+	return reply.bytestr()
 }
 
 @[inline]

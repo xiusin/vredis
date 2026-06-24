@@ -13,8 +13,14 @@ pub fn (mut r Redis) hexists(key string, field string) !bool {
 	return r.send('HEXISTS', key, field)!.@is(1)
 }
 
+// hget returns the value associated with `field` in the hash at `key`.
+// Returns err_nil when the key or field does not exist.
 pub fn (mut r Redis) hget(key string, field string) !string {
-	return r.send('HGET', key, field)!.bytestr()
+	reply := r.send('HGET', key, field)!
+	if reply.kind == .nil_reply {
+		return err_nil
+	}
+	return reply.bytestr()
 }
 
 pub fn (mut r Redis) hgetall(key string) !map[string]string {

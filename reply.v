@@ -26,8 +26,6 @@ pub:
 
 const ok_flag = 'OK'
 
-const nil_flag = '(nil)'
-
 const crlf = '\r\n'
 
 // ok reports whether the reply is a simple-status "OK".
@@ -43,15 +41,19 @@ pub fn (r Reply) nil() bool {
 }
 
 // str returns the canonical string representation of the reply payload.
-// For integer replies this is the decimal text; for nil it is "(nil)";
-// otherwise it is the raw string payload. This is the single source of
-// truth used by bytestr/is/data so conversions happen at most once per
-// conceptual access.
+// For integer replies this is the decimal text; for nil it is the empty
+// string; otherwise it is the raw string payload. This is the single
+// source of truth used by bytestr/is/data so conversions happen at most
+// once per conceptual access.
+//
+// Note: callers that need to distinguish "key does not exist" from an
+// empty string value must inspect `reply.kind == .nil_reply` (or use the
+// command wrappers that return err_nil, such as get / hget / zscore).
 @[inline]
 pub fn (r Reply) str() string {
 	return match r.kind {
 		.integer { r.int_val.str() }
-		.nil_reply { nil_flag }
+		.nil_reply { '' }
 		else { r.str_val }
 	}
 }

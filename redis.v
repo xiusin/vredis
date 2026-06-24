@@ -211,9 +211,14 @@ pub fn (mut r Redis) persist(key string) !int {
 	return r.send('PERSIST', key)!.int()
 }
 
-@[inline]
+// randomkey returns a random key from the current database. Returns
+// err_nil when the database is empty.
 pub fn (mut r Redis) randomkey() !string {
-	return r.send('RANDOMKEY')!.bytestr()
+	reply := r.send('RANDOMKEY')!
+	if reply.kind == .nil_reply {
+		return err_nil
+	}
+	return reply.bytestr()
 }
 
 @[inline]

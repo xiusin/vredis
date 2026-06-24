@@ -35,14 +35,24 @@ pub fn (mut r Redis) strlen(key string) !int {
 	return r.send('STRLEN', key)!.int()
 }
 
-@[inline]
+// get returns the string value stored at `key`. Returns err_nil when
+// the key does not exist.
 pub fn (mut r Redis) get(key string) !string {
-	return r.send('GET', key)!.bytestr()
+	reply := r.send('GET', key)!
+	if reply.kind == .nil_reply {
+		return err_nil
+	}
+	return reply.bytestr()
 }
 
-@[inline]
+// getset atomically sets `key` to `value` and returns the previous
+// value. Returns err_nil when the key did not exist.
 pub fn (mut r Redis) getset(key string, value string) !string {
-	return r.send('GETSET', key, value)!.bytestr()
+	reply := r.send('GETSET', key, value)!
+	if reply.kind == .nil_reply {
+		return err_nil
+	}
+	return reply.bytestr()
 }
 
 @[inline]
@@ -79,7 +89,8 @@ pub fn (mut r Redis) getbit(key string, offset int) !int {
 }
 
 // mget returns a map of key→value for the requested keys. Keys that do
-// not exist map to the nil sentinel "(nil)".
+// not exist are omitted from the map; callers can distinguish "missing"
+// from "present with empty value" via `key in map`.
 pub fn (mut r Redis) mget(key string, keys ...string) !map[string]string {
 	mut args := [CmdArg(key)]
 	for it in keys {
@@ -87,10 +98,15 @@ pub fn (mut r Redis) mget(key string, keys ...string) !map[string]string {
 	}
 
 	mut data := map[string]string{}
-	vals := r.send('MGET', ...args)!.strings()
-
-	for i := 0; i < args.len; i++ {
-		data[args[i] as string] = vals[i]
+	reply := r.send('MGET', ...args)!
+	if reply.kind != .array {
+		return data
+	}
+	for i, elem in reply.arr {
+		if elem.kind == .nil_reply {
+			continue
+		}
+		data[args[i] as string] = elem.str_val
 	}
 	return data
 }
