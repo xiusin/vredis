@@ -1,12 +1,12 @@
 module vredis
 
 fn test_set() ! {
-	mut redis := new_client()!
+	mut redis := new_client(db: 9)!
 	defer {
 		redis.close() or {}
 	}
 
-	assert redis.flushall()!
+	assert redis.flushdb()!
 	assert redis.zadd('sets', 1, 'v1', '2', 'v2')! == 2
 	assert redis.zscan('sets', pattern: '*', cursor: 0)!.result.len == 4
 	assert redis.zcard('sets')! == 2
@@ -17,14 +17,21 @@ fn test_set() ! {
 	assert redis.zlexcount('sets', '-', '+')! == 2
 	assert redis.zlexcount('sets', '+', '-')! == 0
 	assert redis.zrank('sets', 'v2')! == 1
-	assert redis.zrange('sets', 0, -1)!.bytestr() == "['v1', 'v2']"
-	assert redis.zrevrange('sets', 0, -1)!.bytestr() == "['v2', 'v1']"
-	assert redis.zrange('sets', 1, 2, true)!.bytestr() == "['v2', '2']"
-	assert redis.zrevrange('sets', 1, 2, true)!.bytestr() == "['v1', '1']"
-	assert redis.zrangebyscore('sets', '-inf', '+inf', withscores: false)!.bytestr() == "['v1', 'v2']"
-	assert redis.zrangebyscore('sets', '-inf', '+inf', withscores: true)!.bytestr() == "['v1', '1', 'v2', '2']"
-	assert redis.zrangebyscore('sets', '-inf', '+inf', withscores: true, count: 1)!.bytestr() == "['v1', '1']"
-	assert redis.zrangebyscore('sets', '-inf', '+inf', withscores: true, offset: 1, count: 1)!.bytestr() == "['v2', '2']"
+	assert redis.zrange('sets', 0, -1)! == ['v1', 'v2']
+	assert redis.zrevrange('sets', 0, -1)! == ['v2', 'v1']
+	assert redis.zrange('sets', 1, 2, true)! == ['v2', '2']
+	assert redis.zrevrange('sets', 1, 2, true)! == ['v1', '1']
+	assert redis.zrangebyscore('sets', '-inf', '+inf', withscores: false)! == ['v1', 'v2']
+	assert redis.zrangebyscore('sets', '-inf', '+inf', withscores: true)! == ['v1', '1', 'v2',
+		'2']
+	assert redis.zrangebyscore('sets', '-inf', '+inf', withscores: true, count: 1)! == [
+		'v1',
+		'1',
+	]
+	assert redis.zrangebyscore('sets', '-inf', '+inf', withscores: true, offset: 1, count: 1)! == [
+		'v2',
+		'2',
+	]
 	assert redis.zrangebylex('sets', '-', '+', count: 1)![0] == 'v1'
 	assert redis.zrem('sets', 'v1')! == 1
 	assert redis.zcard('sets')! == 1

@@ -75,7 +75,17 @@ pub fn (mut r Redis) hmset(key string, field string, value string, fvs ...string
 	return r.send('HMSET', ...args)!.ok()
 }
 
-// TODO 实现hscan
-fn (mut r Redis) hscan(key string, cursor string, @match string, count ...int) !bool {
-	panic('Implementing')
+// hscan iterates hash field/value pairs using the cursor-based HSCAN command.
+pub fn (mut r Redis) hscan(key string, opts ScanOpts) !ScanReply {
+	mut args := [CmdArg(key), CmdArg(opts.cursor)]
+	if opts.pattern.len > 0 {
+		args << 'MATCH'
+		args << opts.pattern
+	}
+	if opts.count > 0 {
+		args << 'COUNT'
+		args << opts.count
+	}
+	reply := r.send('HSCAN', ...args)!
+	return parse_scan_reply(reply)
 }
