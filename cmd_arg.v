@@ -3,9 +3,13 @@ module vredis
 import strings
 
 // CmdArg is a sum type representing a single Redis command argument.
-// Using a sum type lets callers pass strings and numeric values without
-// manual string conversion at every call site.
-pub type CmdArg = f64 | i64 | int | string | u64
+// Using a sum type lets callers pass strings, numeric values, and
+// booleans without manual string conversion at every call site.
+//
+// For structured data (structs, maps, arrays), encode to JSON first and
+// pass the resulting string — see Redis.set_json / get_json for a
+// typed convenience wrapper.
+pub type CmdArg = bool | f64 | i64 | int | string | u64
 
 // CmdArgs is a growable list of command arguments that knows how to
 // serialise itself into a RESP request.
@@ -15,21 +19,28 @@ pub type CmdArgs = []CmdArg
 // is the value that gets length-prefixed in the RESP wire format.
 @[inline]
 fn (arg CmdArg) to_str() string {
-	match arg {
+	return match arg {
 		string {
-			return arg
+			arg
 		}
 		int {
-			return arg.str()
+			arg.str()
 		}
 		i64 {
-			return arg.str()
+			arg.str()
 		}
 		u64 {
-			return arg.str()
+			arg.str()
 		}
 		f64 {
-			return arg.str()
+			arg.str()
+		}
+		bool {
+			if arg {
+				'1'
+			} else {
+				'0'
+			}
 		}
 	}
 }

@@ -1,5 +1,6 @@
 module vredis
 
+import json
 import net
 import sync
 import time
@@ -318,4 +319,34 @@ fn parse_scan_reply(reply &Reply) !ScanReply {
 		cursor: cursor_str.u64()
 		result: result
 	}
+}
+
+// ---------------------------------------------------------------------------
+// JSON convenience wrappers for structured data.
+//
+// Redis stores strings; structs/maps must be serialised before storage.
+// These generic helpers encode/decode JSON transparently so callers can
+// treat Redis as a typed key-value store without manual json.encode /
+// json.decode at every call site.
+//
+// Example:
+//   struct User { name string; age int }
+//   r.set_json('user:1', User{'alice', 30})!
+//   u := r.get_json[User]('user:1')!
+// ---------------------------------------------------------------------------
+
+// set_json serialises `val` to JSON and stores it at `key`. Returns true
+// on success. The JSON encoding follows V's standard json module rules
+// (struct field names lowercased by default; @[json: 'name'] tags
+// respected).
+pub fn (mut r Redis) set_json[T](key string, val T) !bool {
+	return r.set(key, json.encode(val))!
+}
+
+// get_json retrieves the string at `key` and decodes it into T. Returns
+// err_nil when the key does not exist, or an error if the stored value
+// is not valid JSON for T.
+pub fn (mut r Redis) get_json[T](key string) !T {
+	raw := r.get(key) or { return err_nil }
+	return json.decode(T, raw) or { error('redis: json decode failed for key "${key}"') }
 }
