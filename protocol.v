@@ -90,12 +90,7 @@ fn (mut p Protocol) read_full(need int) !string {
 }
 
 // read_reply parses one complete RESP reply and returns a typed Reply.
-//
-// The optional `is_sub` parameter is retained for backwards
-// compatibility with the previous API but is no longer needed: the
-// parser is now fully structural and does not rely on CRLF stripping
-// heuristics.
-pub fn (mut p Protocol) read_reply(is_sub ...bool) !Reply {
+pub fn (mut p Protocol) read_reply() !Reply {
 	line := p.read_line()!
 	if line.len == 0 {
 		return err_read_message

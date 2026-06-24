@@ -164,10 +164,11 @@ pub fn (mut r Redis) close() ! {
 	r.is_active = false
 
 	// Best-effort QUIT; ignore write errors on a broken connection.
+	// Use the RESP serialiser for protocol consistency.
 	if r.debug {
 		println('-> QUIT')
 	}
-	r.socket.write_string('QUIT\r\n') or {}
+	r.socket.write_string(build_cmd('QUIT')) or {}
 	r.socket.close() or {}
 }
 

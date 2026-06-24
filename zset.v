@@ -1,7 +1,5 @@
 module vredis
 
-import strconv
-
 // ZrangeOpt carries optional LIMIT / WITHSCORES flags for the
 // ZRANGEBYSCORE / ZRANGEBYLEX family of commands.
 @[params]
@@ -13,9 +11,10 @@ pub:
 }
 
 // zadd adds one or more score/member pairs to a sorted set.
-// The variadic arguments must alternate score (string-encoded integer)
-// and member, e.g. zadd('k', 1, 'a', '2', 'b').
-pub fn (mut r Redis) zadd(key string, source1 int, member1 string, source_member ...string) !int {
+// `source1` is the score of `member1`; the variadic arguments must
+// alternate score (string-encoded, e.g. "1.5" / "-inf" / "+inf") and
+// member, e.g. zadd('k', 1.0, 'a', '2.5', 'b').
+pub fn (mut r Redis) zadd(key string, source1 f64, member1 string, source_member ...string) !int {
 	if source_member.len % 2 != 0 {
 		return error('Scores and members must appear in pairs')
 	}
@@ -24,10 +23,7 @@ pub fn (mut r Redis) zadd(key string, source1 int, member1 string, source_member
 	args << source1
 	args << member1
 
-	for i, member in source_member {
-		if i % 2 == 0 {
-			strconv.atoi(member)!
-		}
+	for member in source_member {
 		args << member
 	}
 
@@ -40,7 +36,7 @@ pub fn (mut r Redis) zcard(key string) !int {
 }
 
 @[inline]
-pub fn (mut r Redis) zcount(key string, min int, max int) !int {
+pub fn (mut r Redis) zcount(key string, min string, max string) !int {
 	return r.send('ZCOUNT', key, min, max)!.int()
 }
 
@@ -50,8 +46,8 @@ pub fn (mut r Redis) zlexcount(key string, min string, max string) !int {
 }
 
 @[inline]
-pub fn (mut r Redis) zincrby(key string, increment int, member string) !int {
-	return r.send('ZINCRBY', key, increment, member)!.int()
+pub fn (mut r Redis) zincrby(key string, increment f64, member string) !f64 {
+	return r.send('ZINCRBY', key, increment, member)!.f64()
 }
 
 pub fn (mut r Redis) zinterstore(destination string, numkeys int, key string, keys ...string) !int {
@@ -79,9 +75,15 @@ pub fn (mut r Redis) zrank(key string, member string) !int {
 	return r.send('ZRANK', key, member)!.int()
 }
 
-@[inline]
-pub fn (mut r Redis) zscore(key string, member string) !int {
-	return r.send('ZSCORE', key, member)!.int()
+// zscore returns the score of a member as a float. Redis returns the
+// score as a bulk string (e.g. "1" or "2.5"), so f64() is the correct
+// accessor. Returns err_nil when the member does not exist.
+pub fn (mut r Redis) zscore(key string, member string) !f64 {
+	reply := r.send('ZSCORE', key, member)!
+	if reply.kind == .nil_reply {
+		return err_nil
+	}
+	return reply.f64()
 }
 
 pub fn (mut r Redis) zrem(key string, member1 string, member2 ...string) !int {
@@ -94,7 +96,7 @@ pub fn (mut r Redis) zrem(key string, member1 string, member2 ...string) !int {
 }
 
 @[inline]
-pub fn (mut r Redis) zremrangebyscore(key string, min int, max int) !int {
+pub fn (mut r Redis) zremrangebyscore(key string, min string, max string) !int {
 	return r.send('ZREMRANGEBYSCORE', key, min, max)!.int()
 }
 
@@ -155,11 +157,19 @@ pub fn (mut r Redis) zrevrange(key string, start int, stop int, withsources ...b
 	return r.send('ZREVRANGE', ...args)!.strings()
 }
 
-// zrevbyscore returns members with scores in [min, max] in reverse order.
-// Bug fix: the previous implementation sent the non-existent command
-// "ZREVBYSCORE"; the correct Redis command is "ZREVRANGEBYSCORE".
-pub fn (mut r Redis) zrevbyscore(key string, min int, max int) ![]string {
-	return r.send('ZREVRANGEBYSCORE', key, min, max)!.strings()
+// zrevbyscore returns members with scores in the range [min, max] in
+// reverse (descending) order via ZREVRANGEBYSCORE.
+//
+// Note: Redis's native syntax is `ZREVRANGEBYSCORE key max min`, so the
+// parameters are ordered max-first to match. `max`/`min` accept score
+// expressions such as "1.5", "-inf", "+inf", or "(2.5" for an exclusive
+// bound.
+//
+// Bug fix: the previous implementation both used the wrong parameter
+// order (min, max) and restricted the bounds to int, which made the
+// command return the wrong range and prevented -inf/+inf/float usage.
+pub fn (mut r Redis) zrevbyscore(key string, max string, min string) ![]string {
+	return r.send('ZREVRANGEBYSCORE', key, max, min)!.strings()
 }
 
 @[inline]
