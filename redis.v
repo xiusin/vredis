@@ -64,6 +64,11 @@ fn (r &Redis) str() string {
 // The mutex guarantees that a reply is always paired with the command
 // that produced it, even when multiple goroutines share the same
 // connection (though a Pool is the recommended way to parallelise).
+//
+// Performance: build_cmd() constructs the RESP wire format in a single
+// pass without allocating an intermediate []CmdArg — the command name
+// and variadic params are converted to strings exactly once and written
+// to a pre-sized builder.
 pub fn (mut r Redis) send(cmd string, params ...CmdArg) !&Reply {
 	r.@lock()
 	defer {
@@ -74,14 +79,7 @@ pub fn (mut r Redis) send(cmd string, params ...CmdArg) !&Reply {
 		return err_conn_no_active
 	}
 
-	// Build the argument list with a single allocation.
-	mut args := []CmdArg{cap: 1 + params.len}
-	args << CmdArg(cmd)
-	args << params
-
-	// Wrap in CmdArgs so we can use the RESP serialiser.
-	mut cmd_args := CmdArgs(args)
-	r.write_cmd(cmd_args.build())!
+	r.write_cmd(build_cmd(cmd, ...params))!
 
 	reply := r.protocol.read_reply()!
 	return &reply

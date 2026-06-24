@@ -6,8 +6,6 @@ import time
 // Pool-level errors shared across the package.
 pub const err_pool_exhausted = error('vredis: connection pool exhausted')
 
-pub const err_pool_get_failed = error('vredis: connection pool get redis instance failed')
-
 pub const err_conn_closed = error('vredis: connection closed')
 
 pub const err_conn_no_active = error('vredis: client no active')
@@ -28,6 +26,17 @@ pub:
 	test_on_borrow     fn (mut ActiveRedisConn) ! = unsafe { nil } // optional health-check invoked on every borrow
 }
 
+// PoolStats is a snapshot of the pool's internal counters at a point
+// in time. It is returned by Pool.stats() for observability and
+// debugging.
+pub struct PoolStats {
+pub:
+	active     int // connections currently borrowed (not idle)
+	idle       int // connections sitting in the idle channel
+	max_active int // configured upper bound on active connections
+	is_closed  bool
+}
+
 // Pool is a bounded, channel-backed connection pool.
 //
 // Concurrency model
@@ -39,10 +48,23 @@ pub:
 // The mutex is held only for O(1) bookkeeping (counter / flag updates),
 // never during network I/O. This means that a slow dial() in one
 // goroutine does not block a get() that can reuse an idle connection.
+//
+// Lifecycle
+// ---------
+//  1. get()  → reserve() a slot, reuse idle or dial fresh, return conn.
+//  2. release() → put() the conn back (or close it if the pool is closed).
+//  3. close() → mark closed, drain idle conns. Borrowed conns are
+//     closed when their owners call release().
+//
+// The idle channel is intentionally never closed. Closing it would
+// race with concurrent put() calls and cause a panic on send. Instead,
+// put() checks is_closed under the mutex and closes the connection
+// directly when the pool is shut down.
 pub struct Pool {
 mut:
 	is_closed   bool
 	active      int // connections currently borrowed (not in the channel)
+	idle        int // connections sitting in the idle channel
 	opt         PoolOpt
 	connections chan &ActiveRedisConn
 	mu          &sync.Mutex
@@ -52,6 +74,9 @@ mut:
 pub fn new_pool(opt PoolOpt) !&Pool {
 	if isnil(opt.dial) {
 		return error('vredis: invalid dial fn setting')
+	}
+	if opt.max_active <= 0 {
+		return error('vredis: max_active must be positive')
 	}
 	return &Pool{
 		opt:         opt
@@ -114,12 +139,22 @@ fn (p &Pool) is_conn_valid(c &ActiveRedisConn) bool {
 //     continues without consuming a new slot.
 //  3. If no idle connection is available, dial a new one. A dial
 //     failure releases the reserved slot and propagates the error.
+//
+// The loop is guaranteed to either return a valid connection or
+// propagate an error: step 2 reuses an idle conn or falls through to
+// step 3, and step 3 either returns a fresh conn or returns the dial
+// error (after releasing the slot).
 pub fn (mut p Pool) get() !&ActiveRedisConn {
 	p.reserve()!
 
 	for {
 		select {
 			mut client := <-p.connections {
+				// Account for the connection leaving the idle queue.
+				p.mu.@lock()
+				p.idle--
+				p.mu.unlock()
+
 				// Validate the idle connection before handing it out.
 				if !p.is_conn_valid(client) {
 					client.close() or {}
@@ -148,12 +183,19 @@ pub fn (mut p Pool) get() !&ActiveRedisConn {
 			}
 		}
 	}
-
-	return err_pool_get_failed
+	// Unreachable — the for loop above either returns a connection or
+	// propagates a dial error. V's compiler requires an explicit return.
+	return error('vredis: unreachable in Pool.get()')
 }
 
 // put returns a borrowed connection to the pool. If the pool is closed
 // or the channel is full, the connection is closed instead.
+//
+// The is_closed check is performed under the mutex. If the pool is
+// open, active is decremented and the connection is pushed to the
+// channel outside the lock (non-blocking; closes the conn if the
+// channel is full). If the pool is closed, the connection is closed
+// directly.
 pub fn (mut p Pool) put(mut client ActiveRedisConn) {
 	p.mu.@lock()
 	if p.is_closed {
@@ -162,6 +204,7 @@ pub fn (mut p Pool) put(mut client ActiveRedisConn) {
 		return
 	}
 	if !client.is_active {
+		// Already returned — prevent double-release.
 		p.mu.unlock()
 		return
 	}
@@ -170,18 +213,44 @@ pub fn (mut p Pool) put(mut client ActiveRedisConn) {
 	client.put_in_time = time.now().unix()
 	p.mu.unlock()
 
-	// Non-blocking push back into the channel.
+	// Non-blocking push back into the channel. If the channel is full
+	// (more idle conns than max_active, which shouldn't happen but is
+	// defensive), close the connection.
 	select {
-		p.connections <- client {}
+		p.connections <- client {
+			p.mu.@lock()
+			p.idle++
+			p.mu.unlock()
+		}
 		else {
 			client.close() or {}
 		}
 	}
 }
 
+// stats returns a snapshot of the pool's internal counters for
+// observability and debugging.
+pub fn (mut p Pool) stats() PoolStats {
+	p.mu.@lock()
+	defer {
+		p.mu.unlock()
+	}
+	return PoolStats{
+		active:     p.active
+		idle:       p.idle
+		max_active: p.opt.max_active
+		is_closed:  p.is_closed
+	}
+}
+
 // close marks the pool as closed and discards all idle connections.
 // Connections that are currently borrowed are not closed here; they
-// will be closed when their caller invokes release().
+// will be closed when their caller invokes release() (which calls
+// put(), and put() closes the conn when is_closed is true).
+//
+// The idle channel is not closed to avoid racing with concurrent
+// put() calls. It will be garbage-collected when the Pool itself is
+// dropped.
 pub fn (mut p Pool) close() {
 	p.mu.@lock()
 	if p.is_closed {
@@ -202,5 +271,9 @@ pub fn (mut p Pool) close() {
 			}
 		}
 	}
-	p.connections.close()
+
+	// All idle connections have been closed.
+	p.mu.@lock()
+	p.idle = 0
+	p.mu.unlock()
 }

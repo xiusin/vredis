@@ -42,14 +42,17 @@ pub fn (mut r Redis) psubscribe(channels []string, cb fn (string, string, string
 // subscription loop so that no other command interleaves with the
 // message stream. On exit (error or normal return) the connection is
 // unsubscribed and the read timeout is restored.
+//
+// Wire format: both the subscribe and unsubscribe commands are emitted
+// as proper RESP arrays via build_cmd(), ensuring binary-safe channel
+// names and full protocol compliance.
 pub fn (mut r Redis) subscribe_(cmd string, channels []string, cb fn (&Reply) !) ! {
+	// Convert channel names to CmdArg once — reused for both subscribe
+	// and the unsubscribe that runs in the defer block.
 	mut args := []CmdArg{cap: channels.len}
 	for ch in channels {
 		args << ch
 	}
-
-	// Build the subscribe command using the same RESP serialiser as send().
-	mut cmd_args := CmdArgs(args)
 
 	r.@lock()
 
@@ -66,12 +69,15 @@ pub fn (mut r Redis) subscribe_(cmd string, channels []string, cb fn (&Reply) !)
 		unsubscribe_cmd := if cmd == 'SUBSCRIBE' { 'UNSUBSCRIBE' } else { 'PUNSUBSCRIBE' }
 		// Send unsubscribe directly via the socket — we cannot call
 		// send() because it would try to re-lock the mutex we hold.
-		r.write_cmd('${unsubscribe_cmd} ${cmd_args.build()}') or {}
+		// build_cmd() produces a proper RESP array, unlike the previous
+		// inline-format concatenation which mixed command name with
+		// RESP-encoded arguments.
+		r.write_cmd(build_cmd(unsubscribe_cmd, ...args)) or {}
 		r.unlock()
 	}
 
-	// Send the subscribe command.
-	r.write_cmd('${cmd} ${cmd_args.build()}')!
+	// Send the subscribe command as a proper RESP array.
+	r.write_cmd(build_cmd(cmd, ...args))!
 
 	// Message loop — exits when read_reply returns an error (e.g. the
 	// socket is closed) or when cb returns an error.
@@ -87,7 +93,8 @@ pub fn (mut r Redis) publish(channel string, message string) !int {
 }
 
 pub fn (mut r Redis) pubsub(subcommand string, arguments ...string) !string {
-	mut args := [CmdArg(subcommand)]
+	mut args := []CmdArg{cap: 1 + arguments.len}
+	args << subcommand
 	for arg in arguments {
 		args << arg
 	}
