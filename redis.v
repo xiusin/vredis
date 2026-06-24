@@ -350,3 +350,25 @@ pub fn (mut r Redis) get_json[T](key string) !T {
 	raw := r.get(key) or { return err_nil }
 	return json.decode(T, raw) or { error('redis: json decode failed for key "${key}"') }
 }
+
+// encode serialises `val` to a JSON string. It is the building block for
+// storing structured data in Redis types other than plain strings (e.g.
+// list elements, set members, zset members) where a dedicated _json
+// wrapper is not provided.
+//
+// Example:
+//   r.rpush('logs', r.encode(LogEntry{...}))!
+//   log := r.decode[LogEntry](r.lindex('logs', 0)!)!
+@[inline]
+pub fn (mut r Redis) encode[T](val T) string {
+	return json.encode(val)
+}
+
+// decode parses a JSON string into T. It is the symmetric partner of
+// encode(). Unlike get_json, it does not consult Redis — use it to
+// decode values fetched via non-string commands (lindex, srandmember,
+// etc.).
+@[inline]
+pub fn (mut r Redis) decode[T](raw string) !T {
+	return json.decode(T, raw) or { error('redis: json decode failed') }
+}
