@@ -8,12 +8,12 @@ b
 c
 
 d'
-	mut redis := new_client()!
+	mut redis := new_client(db: 5)!
 	defer {
 		redis.close() or {}
 	}
 
-	redis.flushall()!
+	redis.flushdb()!
 
 	println(redis.eval("return {1,2,{3,'hello world'}}", 0)!.strings()) // no support
 

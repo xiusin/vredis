@@ -20,3 +20,6 @@ bin/
 .env
 
 *.log
+
+# Redis
+dump.rdb

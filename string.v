@@ -35,14 +35,24 @@ pub fn (mut r Redis) strlen(key string) !int {
 	return r.send('STRLEN', key)!.int()
 }
 
-@[inline]
+// get returns the string value stored at `key`. Returns err_nil when
+// the key does not exist.
 pub fn (mut r Redis) get(key string) !string {
-	return r.send('GET', key)!.bytestr()
+	reply := r.send('GET', key)!
+	if reply.kind == .nil_reply {
+		return err_nil
+	}
+	return reply.bytestr()
 }
 
-@[inline]
+// getset atomically sets `key` to `value` and returns the previous
+// value. Returns err_nil when the key did not exist.
 pub fn (mut r Redis) getset(key string, value string) !string {
-	return r.send('GETSET', key, value)!.bytestr()
+	reply := r.send('GETSET', key, value)!
+	if reply.kind == .nil_reply {
+		return err_nil
+	}
+	return reply.bytestr()
 }
 
 @[inline]
@@ -70,14 +80,17 @@ pub fn (mut r Redis) set(key string, value string) !bool {
 	return r.send('SET', key, value)!.ok()
 }
 
-pub fn (mut r Redis) setbit(key string, offset int, value int) !bool {
-	return r.send('SETBIT', key, offset, value)!.@is(1)
+pub fn (mut r Redis) setbit(key string, offset int, value int) !int {
+	return r.send('SETBIT', key, offset, value)!.int()
 }
 
 pub fn (mut r Redis) getbit(key string, offset int) !int {
 	return r.send('GETBIT', key, offset)!.int()
 }
 
+// mget returns a map of key→value for the requested keys. Keys that do
+// not exist are omitted from the map; callers can distinguish "missing"
+// from "present with empty value" via `key in map`.
 pub fn (mut r Redis) mget(key string, keys ...string) !map[string]string {
 	mut args := [CmdArg(key)]
 	for it in keys {
@@ -85,33 +98,45 @@ pub fn (mut r Redis) mget(key string, keys ...string) !map[string]string {
 	}
 
 	mut data := map[string]string{}
-	vals := r.send('MGET', ...args)!.strings()
-
-	for i := 0; i < args.len; i++ {
-		data[args[i] as string] = vals[i]
+	reply := r.send('MGET', ...args)!
+	if reply.kind != .array {
+		return data
+	}
+	for i, elem in reply.arr {
+		if elem.kind == .nil_reply {
+			continue
+		}
+		data[args[i] as string] = elem.str_val
 	}
 	return data
 }
 
+// set_opts issues a SET command with optional EX/PX/NX/XX/KEEPTTL flags.
+//
+// Bug fix: the previous implementation omitted `key` from the argument
+// list, so every call sent `SET <value> [flags]` which either failed or
+// set the wrong key.
 pub fn (mut r Redis) set_opts(key string, value string, opts SetOpts) !bool {
-	mut args := [CmdArg(value)]
-	if opts.ex == -4 && opts.px == -4 {
-	} else if opts.ex != -4 {
+	mut args := [CmdArg(key), CmdArg(value)]
+
+	if opts.ex != -4 {
 		args << 'EX'
-		args << '${opts.ex}'
-	} else {
+		args << opts.ex
+	} else if opts.px != -4 {
 		args << 'PX'
-		args << '${opts.px}'
+		args << opts.px
 	}
-	 if opts.nx == false && opts.xx == false {
-	} else if opts.nx == true {
+
+	if opts.nx {
 		args << 'NX'
-	} else {
+	} else if opts.xx {
 		args << 'XX'
 	}
-	if opts.keep_ttl  {
+
+	if opts.keep_ttl {
 		args << 'KEEPTTL'
 	}
+
 	return r.send('SET', ...args)!.ok()
 }
 
@@ -123,5 +148,5 @@ pub fn (mut r Redis) keys(pattern string) ![]string {
 pub fn (mut r Redis) psetex(key string, millis int, value string) !bool {
 	return r.set_opts(key, value, SetOpts{
 		px: millis
-	})
+	})!
 }

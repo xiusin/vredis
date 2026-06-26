@@ -1,5 +1,7 @@
 module vredis
 
+import json
+
 pub fn (mut r Redis) hdel(key string, field string, fields ...string) !bool {
 	mut args := [CmdArg(key), CmdArg(field)]
 	for it in fields {
@@ -13,8 +15,14 @@ pub fn (mut r Redis) hexists(key string, field string) !bool {
 	return r.send('HEXISTS', key, field)!.@is(1)
 }
 
+// hget returns the value associated with `field` in the hash at `key`.
+// Returns err_nil when the key or field does not exist.
 pub fn (mut r Redis) hget(key string, field string) !string {
-	return r.send('HGET', key, field)!.bytestr()
+	reply := r.send('HGET', key, field)!
+	if reply.kind == .nil_reply {
+		return err_nil
+	}
+	return reply.bytestr()
 }
 
 pub fn (mut r Redis) hgetall(key string) !map[string]string {
@@ -75,7 +83,45 @@ pub fn (mut r Redis) hmset(key string, field string, value string, fvs ...string
 	return r.send('HMSET', ...args)!.ok()
 }
 
-// TODO 实现hscan
-fn (mut r Redis) hscan(key string, cursor string, @match string, count ...int) !bool {
-	panic('Implementing')
+// hscan iterates hash field/value pairs using the cursor-based HSCAN command.
+pub fn (mut r Redis) hscan(key string, opts ScanOpts) !ScanReply {
+	mut args := [CmdArg(key), CmdArg(opts.cursor)]
+	if opts.pattern.len > 0 {
+		args << 'MATCH'
+		args << opts.pattern
+	}
+	if opts.count > 0 {
+		args << 'COUNT'
+		args << opts.count
+	}
+	reply := r.send('HSCAN', ...args)!
+	return parse_scan_reply(reply)
+}
+
+// ---------------------------------------------------------------------------
+// JSON convenience wrappers for hash fields.
+//
+// A Redis hash maps field→string; storing structured data per field is a
+// common pattern (e.g. one field per object). These helpers serialise
+// the value to JSON transparently.
+//
+// Example:
+//   r.hset_json('users', 'u1', User{'alice', 30})!
+//   u := r.hget_json[User]('users', 'u1')!
+// ---------------------------------------------------------------------------
+
+// hset_json serialises `val` to JSON and stores it at `field` in the
+// hash at `key`. Returns true on success.
+pub fn (mut r Redis) hset_json[T](key string, field string, val T) !bool {
+	return r.hset(key, field, json.encode(val))!
+}
+
+// hget_json retrieves the value at `field` and decodes it into T.
+// Returns err_nil when the key or field does not exist, or an error if
+// the stored value is not valid JSON for T.
+pub fn (mut r Redis) hget_json[T](key string, field string) !T {
+	raw := r.hget(key, field) or { return err_nil }
+	return json.decode(T, raw) or {
+		error('redis: json decode failed for key "${key}" field "${field}"')
+	}
 }

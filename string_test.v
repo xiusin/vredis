@@ -1,13 +1,12 @@
 module vredis
 
 fn test_string() ! {
-	mut redis := new_client()!
+	mut redis := new_client(db: 8)!
 	defer {
 		redis.close() or {}
 	}
-	redis.debug = true
 
-	assert redis.flushall()!
+	assert redis.flushdb()!
 
 	multi_key := 'api
 domain'
@@ -27,7 +26,12 @@ io'
 	assert redis.ttl('website')! == -1
 	assert redis.pttl('website')! == -1
 	assert redis.get('website')! == 'www'
-	assert redis.get('xxxx')! == '(nil)'
+	// get on a missing key returns err_nil (not the "(nil)" sentinel).
+	nil_val := redis.get('xxxx') or {
+		assert err.msg() == 'redis: nil reply'
+		'nil'
+	}
+	assert nil_val == 'nil'
 	assert redis.incr('vredis_counter')! == 1
 	assert redis.incrby('vredis_counter', 2)! == 3
 	assert redis.decrby('vredis_counter', 2)! == 1
@@ -39,11 +43,16 @@ io'
 	assert redis.strlen('website')! == 12
 	assert redis.get('website')! == 'www.vlang.io'
 	assert redis.getrange('website', 0, 2)! == 'www'
-	assert redis.getset('exists', 'exists')! == '(nil)'
+	// getset on a missing key returns err_nil for the old value.
+	nil_old := redis.getset('exists', 'exists') or {
+		assert err.msg() == 'redis: nil reply'
+		'nil'
+	}
+	assert nil_old == 'nil'
 	assert redis.getset('exists', 'exists')! == 'exists'
 	assert redis.setrange('exists', 0, 'mo')! == 6
 	assert redis.get('exists')! == 'moists'
-	assert redis.mget('exists')!.bytestr() == "{'exists': 'moists'}"
+	assert redis.mget('exists')!['exists'] == 'moists'
 	assert redis.keys('*')!.len == 3
 	assert redis.rename('exists', '_exists')!
 	assert redis.exists('exists')! == false
@@ -56,9 +65,9 @@ io'
 	assert redis.pttl('website')! == -1
 	assert redis.renamenx('_exists', 'website')! == false
 	assert redis.renamenx('_exists', 'exists')!
-	assert redis.setbit('bits', 0, 1)!
-	assert redis.getbit('bits', 0) == 1
-	assert redis.getbit('bits', 1) == 0
+	assert redis.setbit('bits', 0, 1)! == 0
+	assert redis.getbit('bits', 0)! == 1
+	assert redis.getbit('bits', 1)! == 0
 
 	println(redis.scan(count: 1)!)
 }

@@ -3,7 +3,7 @@ module vredis
 fn test_pub_sub() ! {
 	mut pool := new_pool(
 		dial: fn () !&Redis {
-			return new_client()!
+			return new_client(db: 3)!
 		}
 	)!
 	defer {

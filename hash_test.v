@@ -1,12 +1,12 @@
 module vredis
 
 fn test_hash() ! {
-	mut redis := new_client()!
+	mut redis := new_client(db: 1)!
 	defer {
 		redis.close() or {}
 	}
 
-	assert redis.flushall()!
+	assert redis.flushdb()!
 
 	assert redis.hset('website', 'api', 'api.vlang.io')!
 	assert redis.hset('website', 'www', 'www.vlang.io')!
